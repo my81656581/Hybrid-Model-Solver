@@ -43,7 +43,7 @@ class Mesh2d(object):
 
     def manually_construct(self, nodes: np.ndarray,
                            elements: np.ndarray) -> bool:
-        if not self.__is_ready_:
+        if not self.ready():
             self.__nodes_ = np.array(nodes)
             self.__elements_ = np.array(elements)
             self.__consturct_adjoint()
@@ -56,10 +56,12 @@ class Mesh2d(object):
         for i, element in enumerate(self.__elements_):
             for j in element:
                 self.__adjoint_[j].append(i)
-        self.__frequent_ = np.reshape(np.array([len(_) for _ in self.__adjoint_]), (self.n_nodes, 1))
+        self.__frequent_ = np.reshape(
+            np.array([len(_) for _ in self.__adjoint_]), (self.n_nodes, 1))
 
     def update_frequent(self):
-        self.__frequent_ = np.reshape(np.array([len(_) for _ in self.__adjoint_]), (self.n_nodes, 1))
+        self.__frequent_ = np.reshape(
+            np.array([len(_) for _ in self.__adjoint_]), (self.n_nodes, 1))
 
     def ready(self):
         return self.__is_ready_
@@ -111,16 +113,14 @@ class Mesh2d(object):
     @property
     def frequent(self):
         return self.__frequent_
-    
 
 
 class PrototypePdMesh2d(Mesh2d):
     def prototype_construct(self, horizon_radius: float) -> None:
         self.__startup(horizon_radius)
-        self.__build_dist()
+        self._build_dist()
         self.__build_bonds()
-        self.is_pd_ready = True
-
+        self._is_pd_ready = True
 
     def __startup(self, horizon_radius) -> None:
         """Startup the peridynamic config.
@@ -131,26 +131,27 @@ class PrototypePdMesh2d(Mesh2d):
             None: By runing this function, the containers will be setted for further use.
         """
         self.__k_horizon_radius_ = horizon_radius
-        self.is_pd_ready = False
+        self._is_pd_ready = False
         self.bonds = [list() for _ in range(self.n_elements)]
 
-
-    def __build_dist(self) -> None:
+    def _build_dist(self) -> None:
         self.centers = np.mean(self.nodes[self.elements], 1)
-        self.__dist_ = squareform(pdist(self.centers))
+        self._dist_ = squareform(pdist(self.centers))
 
-    
     def __build_bonds(self) -> None:
         ngrid_in_line = int(np.sqrt(self.n_elements))
-        assert ngrid_in_line ** 2 == self.n_elements
+        assert ngrid_in_line**2 == self.n_elements
         ngrid_in_halfline = ngrid_in_line // 2
-        assert ngrid_in_halfline ** 2 < self.n_elements
+        assert ngrid_in_halfline**2 < self.n_elements
         i = self.n_elements // 2
         for j in range(i + 1, self.n_elements):
-            dist_ij = self.__dist_[i, j]
+            dist_ij = self._dist_[i, j]
             if dist_ij >= self.horizon_radius: continue
             self.bonds[i].append(j)
             self.bonds[j].append(i)
+
+    def pd_ready(self) -> bool:
+        return self.__is_pd_ready_
 
     @property
     def bonds(self):
@@ -196,15 +197,12 @@ class PrototypePdMesh2d(Mesh2d):
     def outer_radius(self, val):
         self.__k_outer_radius_ = val
 
-    def pd_ready(self) -> bool:
-        return self.__is_pd_ready_
-
     @property
-    def is_pd_ready(self) -> bool:
+    def _is_pd_ready(self) -> bool:
         return self.__is_pd_ready_
 
-    @is_pd_ready.setter
-    def is_pd_ready(self, val):
+    @_is_pd_ready.setter
+    def _is_pd_ready(self, val):
         self.__is_pd_ready_ = val
 
 
@@ -215,11 +213,10 @@ class HybridMesh2d(PrototypePdMesh2d):
                               outer_radius: float = 12e-2) -> None:
         self.__startup(horizon_radius, inner_radius, outer_radius)
         self.__startup_weight_function()
-        self.__build_dist()
+        self._build_dist()
         self.__build_bonds()
-        self.is_pd_ready = True
+        self._is_pd_ready = True
 
-    
     def __startup(self, horizon_radius, inner_radius, outer_radius) -> None:
         """Startup the peridynamic config.
         
@@ -231,12 +228,11 @@ class HybridMesh2d(PrototypePdMesh2d):
         Returns:
             None: By runing this function, the containers will be setted for further use.
         """
-        self.k_horizon_radius_ = horizon_radius
-        self.k_inner_radius_ = inner_radius
-        self.k_outer_radius_ = outer_radius
-        self.is_pd_ready = False
+        self.horizon_radius = horizon_radius
+        self.inner_radius = inner_radius
+        self.outer_radius = outer_radius
+        self._is_pd_ready = False
         self.bonds = [list() for _ in range(self.n_elements)]
-    
 
     def __startup_weight_function(self) -> None:
         # deal with weight function
@@ -246,31 +242,55 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.__is_dgfem_ = [False for _ in range(self.n_elements)]
         self.__ruler_ = [-1 for _ in range(self.n_elements)]
         self.__alpha_rules_ = []
-        d, r0, r1 = self.k_horizon_radius_, self.k_horizon_radius_, self.k_outer_radius_
+        d, r0, r1 = self.horizon_radius, self.horizon_radius, self.outer_radius
         self.__default_slope_ = 1.0 / (r0 - r1 + d)
         self.__default_yintercept_ = (r1 - d) / (r1 - d - r0)
 
-
-    @property
-    def is_dgfem(self):
-        return self.__is_dgfem_
-
+    def __build_bonds(self) -> None:
+        flag, flag_0 = [17.0 / 100 * self.n_elements for _ in range(2)]
+        t0 = time.time()
+        for i in range(self.n_elements):
+            if i > flag:
+                flag = utils.display_progress(
+                    msg="building bonds",
+                    current=flag,
+                    display_sep=flag_0,
+                    current_id=int(i * (2 - i / self.n_elements)),
+                    total=self.n_elements,
+                    start_time=t0)
+            for j in range(i + 1, self.n_elements):
+                dist_ij = self._dist_[i, j]
+                if dist_ij >= self.outer_radius: continue
+                if dist_ij >= self.inner_radius:
+                    self.__interface_ring_[i].add(j)
+                    self.__interface_ring_[j].add(i)
+                    continue
+                self.__inner_circle_[i].add(j)
+                self.__inner_circle_[j].add(i)
+                if dist_ij >= self.horizon_radius: continue
+                self.bonds[i].append(j)
+                self.bonds[j].append(i)
+        tot = time.time() - t0
+        print(f"building bond completed. Total {utils.formatting_time(tot)}")
 
     def namelist_of_dgfem(self):
-        return [_ for _ in range(self.n_elements) if self.__is_critical_[_] and (not self.__is_dgfem_[_])]
+        return [
+            _ for _ in range(self.n_elements)
+            if self.__is_critical_[_] and (not self.__is_dgfem_[_])
+        ]
 
-    
     def convert_mesh_into_DGFEM(self, todolist):
         for e_idx in todolist:
             vertices = self.elements[e_idx, :]
             for vertex in vertices:
                 adjoint_elements = self.adjoint[vertex]
                 for i, e_manipulating in enumerate(adjoint_elements):
-                    if i == 0: # use former node
+                    if i == 0:  # use former node
                         pass
-                    else: # build a new node
+                    else:  # build a new node
                         v_manipulating = self.elements[e_manipulating, :]
-                        new_node = np.array([self.nodes[vertex, 0], self.nodes[vertex, 1]])
+                        new_node = np.array(
+                            [self.nodes[vertex, 0], self.nodes[vertex, 1]])
                         new_node_id = self.n_nodes
                         self.n_nodes += 1
                         self.nodes = np.vstack((self.nodes, new_node))
@@ -281,41 +301,44 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.update_frequent()
         return len(todolist)
 
-
     def manual_set_rule_at_element(self, element_idx: int, *args) -> bool:
-        return False if not self.pd_ready() else self.__put_ruler_at_element(element_idx, *args)
+        return False if not self.pd_ready() else self.__put_ruler_at_element(
+            element_idx, *args)
 
+    def manual_set_rule_at_point(self, x_source: float, y_source: float,
+                                 *args) -> bool:
+        return False if not self.pd_ready() else self.__put_ruler_at_point(
+            x_source, y_source, *args)
 
-    def manual_set_rule_at_point(self, x_source: float, y_source: float, *args) -> bool:
-        return False if not self.pd_ready() else self.__put_ruler_at_point(x_source, y_source, *args)
-
-    
-    def weight_function_builder(self, x_source, y_source, *args) -> Callable[[np.ndarray], float]:
+    def weight_function_builder(self, x_source, y_source,
+                                *args) -> Callable[[np.ndarray], float]:
         # #1: generic_weight_function_builder(self, x_source, y_source)
         # #2: generic_weight_function_builder(self, x_source, y_source, radius0, radius1)
         assert len(args) == 0 or len(args) == 2
         if len(args) == 2:
             radius0, radius1 = args
-            if radius0 == self.k_horizon_radius_ and radius1 == self.k_outer_radius_:
+            if radius0 == self.horizon_radius and radius1 == self.outer_radius:
                 slope, y_intercept = self.__default_slope_, self.__default_yintercept_
             else:
-                hoge = radius1 - self.k_horizon_radius_
+                hoge = radius1 - self.horizon_radius
                 piyo = hoge - radius0
                 slope, y_intercept = -1.0 / piyo, hoge / piyo
         else:
-            radius0, radius1 = self.k_horizon_radius_, self.k_outer_radius_
+            radius0, radius1 = self.horizon_radius, self.outer_radius
             slope, y_intercept = self.__default_slope_, self.__default_yintercept_
+
         def weight_function(x: np.ndarray, y: np.ndarray) -> float:
-            dist = np.sqrt((x - x_source) ** 2 + (y - y_source) ** 2)
+            dist = np.sqrt((x - x_source)**2 + (y - y_source)**2)
             ret = np.zeros(shape=dist.shape)
             ret[dist <= radius0] = 1
-            ret[(dist > radius0) & (dist < radius1)] = dist[(dist > radius0) & (dist < radius1)] * slope + y_intercept
+            ret[(dist > radius0) & (dist < radius1)] = dist[
+                (dist > radius0) & (dist < radius1)] * slope + y_intercept
             ret[ret > 1] = 1
             ret[ret < 0] = 0
             return ret
+
         return weight_function
 
-    
     def __maintain_ruler(self, ruler_id, rule, bonds, interface_ring) -> bool:
         for element in bonds:
             if self.__is_critical_[element]: continue
@@ -326,24 +349,26 @@ class HybridMesh2d(PrototypePdMesh2d):
             if self.__ruler_[element] == -1:
                 self.__ruler_[element] = ruler_id
                 continue
-            alpha_old = self.__alpha_rules_[self.__ruler_[element]](*self.centers[element])
+            alpha_old = self.__alpha_rules_[self.__ruler_[element]](
+                *self.centers[element])
             alpha_new = rule(*self.centers[element])
             if alpha_old < alpha_new:
                 self.__ruler_[element] = ruler_id
         return True
 
-    
     def __put_ruler_at_point(self, x_source, y_source, *args) -> bool:
-        weight_function = self.weight_function_builder(x_source, y_source, *args)
+        weight_function = self.weight_function_builder(x_source, y_source,
+                                                       *args)
         ruler_id = len(self.__alpha_rules_)
         self.__alpha_rules_.append(weight_function)
         bonds, interface_ring = [], []
         if len(args) == 2:
             radius0, radius1 = args
         else:
-            radius0, radius1 = self.k_horizon_radius_, self.k_outer_radius_
+            radius0, radius1 = self.horizon_radius, self.outer_radius
         for element in range(self.n_elements):
-            dist = pdist(np.array([[x_source, y_source], self.centers[element]]))
+            dist = pdist(
+                np.array([[x_source, y_source], self.centers[element]]))
             if dist >= radius1: continue
             if dist >= radius0:
                 interface_ring.append(element)
@@ -352,10 +377,10 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.__maintain_ruler(ruler_id, weight_function, bonds, interface_ring)
         return True
 
-    
     def __put_ruler_at_element(self, element_idx: int, *args) -> bool:
         # weight_function = self.weight_function_builder(x_source, y_source, *args)
-        weight_function = self.weight_function_builder(*self.centers[element_idx], *args)
+        weight_function = self.weight_function_builder(
+            *self.centers[element_idx], *args)
         ruler_id = len(self.__alpha_rules_)
         self.__alpha_rules_.append(weight_function)
         self.__is_critical_[element_idx] = True
@@ -363,74 +388,43 @@ class HybridMesh2d(PrototypePdMesh2d):
         # todo
         self.__maintain_ruler(ruler_id, weight_function,
                               self.bonds[element_idx],
-                              (self.__interface_ring_[element_idx] | self.__inner_circle_[element_idx]))
-                              # (self.__inner_circle_[element_idx]))
-                              # (self.__interface_ring_[element_idx]))
+                              (self.__interface_ring_[element_idx]
+                               | self.__inner_circle_[element_idx]))
+        # (self.__inner_circle_[element_idx]))
+        # (self.__interface_ring_[element_idx]))
         return True
 
-    
-    def query_alpha(self, element_idx: int) -> (int, Callable[[np.ndarray, np.ndarray], float]):
+    def query_alpha(self, element_idx: int
+                    ) -> (int, Callable[[np.ndarray, np.ndarray], float]):
         if self.__is_critical_[element_idx]:
             return 1, np.vectorize(lambda x, y: 1)
         if self.__ruler_[element_idx] == -1:
             return 0, np.vectorize(lambda x, y: 0)
         return -1, self.__alpha_rules_[self.__ruler_[element_idx]]
 
-
     def get_weight_function_value_roughly(self):
         ret = np.zeros(shape=(self.n_nodes, 1))
         for i in range(self.n_elements):
-            flag, weight_function = self.query_alpha(i)
+            weight_function = self.query_alpha(i)[-1]
             for j in self.elements[i, :]:
                 ret[j, 0] += weight_function(*self.nodes[j])
         return ret / self.frequent
-
 
     def get_weight_function_value_exactly(self, gauss_points, basis_config):
         w_, x_, y_ = gauss_points
         n_gauss, w_ = len(w_), np.reshape(w_, (-1))
         ret = np.zeros(shape=(self.n_nodes, 1))
-        xy_local = [basis_config.transform(x_, y_, self.nodes[self.elements[i, :], :], (0, 0)) for i in range(self.n_elements)]
+        xy_local = [
+            basis_config.transform(x_, y_, self.nodes[self.elements[i, :], :],
+                                   (0, 0)) for i in range(self.n_elements)
+        ]
         for i in range(self.n_elements):
-            flag, weight_function = self.query_alpha(i)
+            weight_function = self.query_alpha(i)[-1]
             weight = np.sum(w_ * weight_function(*xy_local[i])) / n_gauss
             for j in self.elements[i, :]:
                 ret[j, 0] += weight
         return ret / self.frequent
 
-    
-    def __build_dist(self) -> None:
-        self.centers = np.mean(self.nodes[self.elements], 1)
-        self.__dist_ = squareform(pdist(self.centers))
-
-    
-    def __build_bonds(self) -> None:
-        flag, flag_0 = [17.0 / 100 * self.n_elements for _ in range(2)]
-        t0 = time.time()
-        for i in range(self.n_elements):
-            if i > flag:
-                flag = utils.display_progress(msg="building bonds",
-                                              current=flag,
-                                              display_sep=flag_0,
-                                              current_id=int(i * (2 - i / self.n_elements)),
-                                              total=self.n_elements,
-                                              start_time=t0)
-            for j in range(i + 1, self.n_elements):
-                dist_ij = self.__dist_[i, j]
-                if dist_ij >= self.k_outer_radius_: continue
-                if dist_ij >= self.k_inner_radius_:
-                    self.__interface_ring_[i].add(j)
-                    self.__interface_ring_[j].add(i)
-                    continue
-                self.__inner_circle_[i].add(j)
-                self.__inner_circle_[j].add(i)
-                if dist_ij >= self.k_horizon_radius_: continue
-                self.bonds[i].append(j)
-                self.bonds[j].append(i)
-        tot = time.time() - t0
-        print(f"building bond completed. Total {utils.formatting_time(tot)}")
-
-    
     def debug_element(self, element_idx: int) -> None:
         print("element {}:".format(element_idx))
         print("\tvertices id: [{}]".format(", ".join(
@@ -442,23 +436,21 @@ class HybridMesh2d(PrototypePdMesh2d):
         print("\touter rings: {}\n".format(", ".join(
             map(str, self.__interface_ring_[element_idx]))))
 
-    
     def debug_element_weight_function(self, element_idx: int) -> None:
         for element in (self.__interface_ring_[element_idx]
                         | self.__inner_circle_[element_idx]):
-            flag, weight_function = self.query_alpha(element)
+            weight_function = self.query_alpha(element)[-1]
             vertices = self.nodes[self.elements[element]]
             for _1, _2 in zip(vertices, self.elements[element]):
                 print(element, _2, weight_function(*_1))
 
-    
     def debug_all_elements(self) -> None:
         for i, _ in enumerate(self.elements):
             self.debug_element(i)
 
-    
-    
-
+    @property
+    def is_dgfem(self):
+        return self.__is_dgfem_
 
 
 def main(input_file):
@@ -482,25 +474,22 @@ def main(input_file):
         meshdata.debug_element_weight_function(49)
 
     if input_file == "data_30_20.msh":
-        for i in range(n_elements):
+        for i in range(meshdata.n_elements):
             print(i, meshdata.elements[i])
         print("------")
-        for i in range(n_nodes):
+        for i in range(meshdata.n_nodes):
             print(i, meshdata.adjoint[i])
         print("======")
-        p, t = meshdata.nodes, meshdata.elements
-        adj, flags = meshdata.adjoint, meshdata.is_dgfem
         meshdata.convert_mesh_into_DGFEM(todolist=[7])
         print(f'meshdata.n_nodes= {meshdata.n_nodes}')
-        for i in range(n_elements):
+        for i in range(meshdata.n_elements):
             print(i, meshdata.elements[i])
         print("------")
-        for i in range(n_nodes):
+        for i in range(meshdata.n_nodes):
             print(i, meshdata.adjoint[i])
         print("======")
         meshdata.convert_mesh_into_DGFEM(todolist=[8, 12, 13])
         print(f'meshdata.n_nodes= {meshdata.n_nodes}')
-
 
 
 if __name__ == "__main__":
