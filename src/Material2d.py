@@ -17,7 +17,7 @@ class Material2d(object):
         self.__lame_mu_ = c33
         self.__lame_lambda_ = c33 * 2.0 * poissons_ratio / (1 -
                                                             2 * poissons_ratio)
-        self.__constructive_ = np.array([[c11, c12, 0], [c12, c11, 0],
+        self.__constitutive_ = np.array([[c11, c12, 0], [c12, c11, 0],
                                          [0, 0, c33]])
 
     @property
@@ -41,8 +41,8 @@ class Material2d(object):
         return self.__lame_mu_
 
     @property
-    def constructive(self):
-        return self.__constructive_
+    def constitutive(self):
+        return self.__constitutive_
 
 
 class PdMaterial2d(Material2d):
@@ -50,75 +50,81 @@ class PdMaterial2d(Material2d):
                  continuum: Material2d = Material2d(),
                  coefficients=np.array([1.0, 1.0, 1.0])):
         super().__init__(continuum.youngs_modulus, continuum.poissons_ratio)
-        self.coefficients = coefficients
+        self.__coefficients_ = coefficients
 
-    def __init_std_meshgrid(self, horizon_radius, grid_size):
-        scale = horizon_radius // grid_size
+    def __init_std_meshgrid(self):
+        scale = self.horizon_radius // self.grid_size
         assert scale > 0
         grids = 2 * scale + 1
-        _l, _r, _d = 0, grids * grid_size, grid_size
+        _l, _r, _d = 0, grids * self.grid_size, self.grid_size
         nodes, elements = build_mesh((_l, _r, _d), (_l, _r, _d))
         n_nodes, n_elements = len(nodes), len(elements)
         self.__mesh_ = PrototypePdMesh2d(n_nodes, n_elements)
         self.__mesh_.manually_construct(np.array(nodes), np.array(elements))
-        self.__mesh_.prototype_construct(horizon_radius)
+        self.__mesh_.prototype_construct(self.horizon_radius)
 
-    def generate_coef(self, inst_len):
+    def generate_coef(self):
         c0, c1, c2 = self.coefficients
-
+        inst_len = self.inst_len
         def helper(x, y):
-            phi, xi = np.arctan2(y, x), np.hypot(x, y)
+            # phi = np.arctan2(y, x)
+            xi = np.hypot(x, y)
             scale = np.array([c0, c1, c2])
             # scale = np.array([c0, c1 * np.cos(2 * phi), c2 * np.cos(4 * phi)])
             return scale * np.exp(-xi / inst_len)
 
         return np.vectorize(helper)
 
-    def setIsotropic(self, horizon_radius, grid_size=0):
-        self.__grid_vol_ = (horizon_radius / 3.0)**2
-        # e = self.youngs_modulus
-        # v = self.poissons_ratio
-        # pid6 = np.pi * horizon_radius ** 6 # \pi \times d^6
-        # self.__coefficients_[0] = 12 * e / (1 - v) / pid6
-        # self.__coefficients_[1] = 0
-        # self.__coefficients_[2] = 0
-        # print(self.__coefficients_)
+    def setIsotropic(self, horizon_radius, grid_size, inst_len):
+        self.__horizon_radius_ = horizon_radius
+        self.__grid_size_ = grid_size
+        self.__inst_len_ = inst_len 
+        self.__syncIsotropic()
 
-    def syncIsotropic(self, horizon_radius, grid_size, inst_len):
-        self.__init_std_meshgrid(horizon_radius, grid_size)
-        grid_vol = grid_size**2
-        coef_fun = self.generate_coef(inst_len)
-        pd_constructive = pd_stiffness.estimate_stiffness_matrix_isotropic(
+    def __syncIsotropic(self):
+        self.__init_std_meshgrid()
+        grid_vol = self.grid_size**2
+        coef_fun = self.generate_coef()
+        pd_constitutive = pd_stiffness.estimate_stiffness_matrix_isotropic(
             self.__mesh_, coef_fun)
-        pd_constructive /= grid_vol
-        # pd_constructive = np.reshape(pd_constructive, (-1, 1))
-        # con_vec = np.reshape(
-        #     np.array([self.constructive[_, _] for _ in range(3)]), (-1, 1))
-        # constructive = np.hstack((con_vec, con_vec, con_vec))
-        # coeff = np.linalg.pinv(constructive) / pd_constructive
-        # self.coefficients = np.reshape(coeff, (-1))
-        self.coefficients = np.diag(self.constructive) / pd_constructive
-        # self.coefficients[0] = self.constructive[0, 0] / pd_constructive[0]
-        # self.coefficients[1] = self.constructive[1, 1] / pd_constructive[1]
-        # self.coefficients[2] = self.constructive[2, 2] / pd_constructive[2]
+        pd_constitutive /= grid_vol
+        self.coefficients = np.diag(self.constitutive) / pd_constitutive
+        coef_fun = self.generate_coef()
+        pd_constitutive = pd_stiffness.estimate_stiffness_matrix_isotropic(
+            self.__mesh_, coef_fun)
+        pd_constitutive /= grid_vol
+        ratio = np.diag(self.constitutive) / pd_constitutive
+        print("Synchronize Complete. Ratio=", ratio)
+        print("Constitutive: (C11, C22, C33)=", np.diag(self.constitutive))
+        print("Peridynamic:  (C11, C22, C33)=", pd_constitutive)
 
-    def testIsotropic(self, horizon_radius, grid_size, inst_len):
-        self.__init_std_meshgrid(horizon_radius, grid_size)
-        grid_vol = grid_size**2
-        coef_fun = self.generate_coef(inst_len)
-        pd_constructive = pd_stiffness.estimate_stiffness_matrix_isotropic(
-            self.__mesh_, coef_fun)
-        pd_constructive /= grid_vol
-        ratio = np.diag(self.constructive) / pd_constructive
-        print("ratio=", ratio)
+    
+    @property
+    def coefficients(self):
+        return self.__coefficients_
+
+    @coefficients.setter
+    def coefficients(self, var):
+        self.__coefficients_ = var
+
+    @property
+    def horizon_radius(self):
+        return self.__horizon_radius_
+
+    @property
+    def grid_size(self):
+        return self.__grid_size_
+
+    @property
+    def inst_len(self):
+        return self.__inst_len_
 
 
 if __name__ == "__main__":
     a = Material2d(3e11, 1.0 / 3)
-    print(a.youngs_modulus, a.poissons_ratio, a.lame_lambda, a.lame_mu)
-    print(a.constructive)
+    print(1, a.youngs_modulus, a.poissons_ratio, a.lame_lambda, a.lame_mu)
+    print(2, a.constitutive)
     b = PdMaterial2d(Material2d(3e11, 1.0 / 3))
-    print(b.youngs_modulus, b.poissons_ratio, b.lame_lambda, b.lame_mu)
-    b.syncIsotropic(0.06, 0.02, 0.015)
+    print(3, b.youngs_modulus, b.poissons_ratio, b.lame_lambda, b.lame_mu)
+    b.setIsotropic(0.06, 0.02, 0.015)
     print("b.coefficients=", b.coefficients)
-    b.testIsotropic(0.06, 0.02, 0.015)
