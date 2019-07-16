@@ -9,23 +9,33 @@ import reference_basis
 
 
 def core_xi2(xi, yi, xj, yj, coef_fun):
+    # dx, dy = xi - xj, yi - yj
+    # ds2 = dx**2 + dy**2
+    # dx2, dxdy, dy2 = dx * dx, dx * dy, dy * dy
+    # core_ = np.array([[dx2, dxdy], [dxdy, dy2]])
+    # return coef_fun(ds2) * core_
     dx, dy = xi - xj, yi - yj
-    ds2 = dx**2 + dy**2
     dx2, dxdy, dy2 = dx * dx, dx * dy, dy * dy
-    core_ = np.array([[dx2, dxdy], [dxdy, dy2]])
-    return coef_fun(ds2) * core_
+    _ = coef_fun(dx, dy) * np.array([dx2, dy2, dxdy])
+    return np.array([[_[0], _[2]], [_[2], _[1]]])
+
+
+
 
 
 def pd_constructive_core(xi, yi, xj, yj, coef_fun):
-    dx2, dy2 = (xi - xj)**2, (yi - yj)**2
-    ds2 = dx2 + dy2
+    # dx2, dy2 = (xi - xj)**2, (yi - yj)**2
+    # ds2 = dx2 + dy2
+    # pd_constructive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
+    # return coef_fun(ds2) * pd_constructive_
+    dx, dy = xi - xj, yi - yj
+    dx2, dy2 = dx**2, dy**2
     pd_constructive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
-    return coef_fun(ds2) * pd_constructive_
+    return coef_fun(dx, dy) * pd_constructive_
 
 
 def pd_constructive_core_est(xi, yi, xj, yj, coef_fun):
     dx, dy = xi - xj, yi - yj
-    phi, xi = np.arctan2(dy, dx), np.hypot(dx, dy)
     dx2, dy2 = dx**2, dy**2
     pd_constructive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
     return coef_fun(dx, dy) * pd_constructive_
