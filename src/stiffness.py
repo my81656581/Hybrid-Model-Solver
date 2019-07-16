@@ -126,13 +126,13 @@ def preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis):
 
 def generate_element_sitffness_matrix_base(local_stiff, vertices, local_jacobi,
                                            n_stiffsize, gauss_points,
-                                           constructive, basis):
+                                           constitutive, basis):
     # elastic matrix D := [[d_11, d_12,    0],
     #                      [d_21, d_22,    0],
     #                      [   0,    0, d_33]]
-    # constructive := [d_11, d_22, d_12, d_33]
+    # constitutive := [d_11, d_22, d_12, d_33]
     w_, x_, y_ = gauss_points
-    d_11, d_22, d_12, d_33 = constructive
+    d_11, d_22, d_12, d_33 = constitutive
     pxgpxpygpy = local_jacobi[:, 0, 0] * local_jacobi[:, 1, 1]
     pygpxpxgpy = local_jacobi[:, 0, 1] * local_jacobi[:, 1, 0]
     w_jcb = w_ * (pxgpxpygpy - pygpxpxgpy)
@@ -165,14 +165,14 @@ def generate_element_sitffness_matrix_base(local_stiff, vertices, local_jacobi,
     return True
 
 
-def generate_stiffness_matrix_k0(nodes, elements, constructive,
+def generate_stiffness_matrix_k0(nodes, elements, constitutive,
                                  basis, jacobis):
     # print(6, nodes.shape, elements.shape)
     w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
     n_elements, n_stiffsize = len(elements), basis.length
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
-    c11, c12 = constructive[0, 0], constructive[0, 1]
-    shear_modulus = constructive[2, 2]
+    c11, c12 = constitutive[0, 0], constitutive[0, 1]
+    shear_modulus = constitutive[2, 2]
     d_11 = np.vectorize(lambda x, y: c11)
     d_22 = np.vectorize(lambda x, y: c11)
     d_12 = np.vectorize(lambda x, y: c12)
@@ -197,7 +197,7 @@ def generate_stiffness_matrix_k0(nodes, elements, constructive,
             local_jacobi=jacobis[i],
             n_stiffsize=n_stiffsize,
             gauss_points=(w_, x_, y_),
-            constructive=(d_11, d_22, d_12, d_33),
+            constitutive=(d_11, d_22, d_12, d_33),
             basis=basis)
     # time counter summary begin
     tot = time.time() - t0

@@ -20,9 +20,6 @@ def core_xi2(xi, yi, xj, yj, coef_fun):
     return np.array([[_[0], _[2]], [_[2], _[1]]])
 
 
-
-
-
 def pd_constitutive_core(xi, yi, xj, yj, coef_fun):
     # dx2, dy2 = (xi - xj)**2, (yi - yj)**2
     # ds2 = dx2 + dy2
@@ -34,14 +31,7 @@ def pd_constitutive_core(xi, yi, xj, yj, coef_fun):
     return coef_fun(dx, dy) * pd_constitutive_
 
 
-def pd_constitutive_core_est(xi, yi, xj, yj, coef_fun):
-    dx, dy = xi - xj, yi - yj
-    dx2, dy2 = dx**2, dy**2
-    pd_constitutive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
-    return coef_fun(dx, dy) * pd_constitutive_
-
-
-def estimate_stiffness_matrix_isotropic(mesh, coef_fun):
+def estimate_stiffness_matrix(mesh, coef_fun):
     nodes, elements, related = mesh.nodes, mesh.elements, mesh.related
     w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
     basis = reference_basis.Quadrilateral4Node()
@@ -55,7 +45,7 @@ def estimate_stiffness_matrix_isotropic(mesh, coef_fun):
         n_elements, n_gauss, jacobis)
     i = n_elements // 2
     xi_local, yi_local = xy_local[i]
-    pd_constitutive_ij = np.array([0.0, 0.0, 0.0])
+    pd_constitutive = np.array([0.0, 0.0, 0.0])
     for j in related[i]:
         xj_local, yj_local = xy_local[j]
         for k in range(n_gauss):
@@ -63,52 +53,10 @@ def estimate_stiffness_matrix_isotropic(mesh, coef_fun):
                 # scale = w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
                 # because of w_[_] == 1
                 scale = det_jacobi[i][k] * det_jacobi[j][l]
-                pd_constitutive_ij += scale * pd_constitutive_core_est(
+                pd_constitutive += scale * pd_constitutive_core(
                     xi_local[k], yi_local[k], xj_local[l], yj_local[l],
                     coef_fun)
-    return pd_constitutive_ij
-
-
-def estimate_stiffness_matrix(nodes, elements, related, coef_fun, basis,
-                              jacobis, material):
-    w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
-    n_elements, n_gauss = len(elements), len(w_)
-    xy_local = [
-        basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
-        for i in range(n_elements)
-    ]
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
-    # time counter init begin
-    t0 = time.time()
-    # time counter init end
-    i = (n_elements - 1) // 2
-    xi_local, yi_local = xy_local[i]
-    pd_constitutive_ij = np.array([0.0, 0.0, 0.0])
-    for j in related[i]:
-        xj_local, yj_local = xy_local[j]
-        for k in range(n_gauss):
-            for l in range(n_gauss):
-                # scale = w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
-                # because of w_[_] == 1
-                scale = det_jacobi[i][k] * det_jacobi[j][l]
-                pd_constitutive_ij += scale * pd_constitutive_core(
-                    xi_local[k], yi_local[k], xj_local[l], yj_local[l],
-                    coef_fun)
-    pd_constitutive_ij /= material.grid_vol
-    print("i=", i)
-    print("vertex_i=", nodes[elements[i, :], :])
-    print("center_i=", np.mean(nodes[elements[i, :], :], 0))
-    print("constitutive=", (pd_constitutive_ij[0], pd_constitutive_ij[1],
-                            pd_constitutive_ij[2], pd_constitutive_ij[2]))
-    material.coefficients[
-        0] = material.constitutive[0, 0] / pd_constitutive_ij[0]
-    # time counter summary begin
-    tot = time.time() - t0
-    print(f"        estimate completed. Total {utils.formatting_time(tot)}")
-    # time counter summary end
-    print(material.coefficients)
-    return material.coefficients[0]
+    return pd_constitutive
 
 
 def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
