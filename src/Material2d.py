@@ -48,7 +48,7 @@ class Material2d(object):
 class PdMaterial2d(Material2d):
     def __init__(self,
                  continuum: Material2d = Material2d(),
-                 coefficients=np.array([1.0, 0.0, 0.0])):
+                 coefficients=np.array([1.0, 1.0, 1.0])):
         super().__init__(continuum.youngs_modulus, continuum.poissons_ratio)
         self.coefficients = coefficients
 
@@ -63,6 +63,17 @@ class PdMaterial2d(Material2d):
         self.__mesh_.manually_construct(np.array(nodes), np.array(elements))
         self.__mesh_.prototype_construct(horizon_radius)
 
+    def generate_coef(self, inst_len):
+        c0, c1, c2 = self.coefficients
+
+        def helper(x, y):
+            phi, xi = np.arctan2(y, x), np.hypot(x, y)
+            scale = np.array([c0, c1, c2])
+            # scale = np.array([c0, c1 * np.cos(2 * phi), c2 * np.cos(4 * phi)])
+            return scale * np.exp(-xi / inst_len)
+
+        return np.vectorize(helper)
+
     def setIsotropic(self, horizon_radius, grid_size=0):
         self.__grid_vol_ = (horizon_radius / 3.0)**2
         # e = self.youngs_modulus
@@ -76,44 +87,30 @@ class PdMaterial2d(Material2d):
     def syncIsotropic(self, horizon_radius, grid_size, inst_len):
         self.__init_std_meshgrid(horizon_radius, grid_size)
         grid_vol = grid_size**2
-        c0, c1, c2 = self.coefficients
-
-        def helper(x, y):
-            phi, xi = np.arctan2(y, x), np.hypot(x, y)
-            scale = c0 + c1 * np.cos(2 * phi) + c2 * np.cos(4 * phi)
-            return scale * np.exp(-xi / inst_len)
-
-        coef_fun = np.vectorize(helper)
+        coef_fun = self.generate_coef(inst_len)
         pd_constructive = pd_stiffness.estimate_stiffness_matrix_isotropic(
             self.__mesh_, coef_fun)
         pd_constructive /= grid_vol
-        print(pd_constructive)
-
         # pd_constructive = np.reshape(pd_constructive, (-1, 1))
         # con_vec = np.reshape(
         #     np.array([self.constructive[_, _] for _ in range(3)]), (-1, 1))
         # constructive = np.hstack((con_vec, con_vec, con_vec))
         # coeff = np.linalg.pinv(constructive) / pd_constructive
         # self.coefficients = np.reshape(coeff, (-1))
-        self.coefficients[0] = self.constructive[0, 0] / pd_constructive[0]
-        self.coefficients[1] = self.constructive[1, 1] / pd_constructive[1]
-        self.coefficients[2] = self.constructive[2, 2] / pd_constructive[2]
+        self.coefficients = np.diag(self.constructive) / pd_constructive
+        # self.coefficients[0] = self.constructive[0, 0] / pd_constructive[0]
+        # self.coefficients[1] = self.constructive[1, 1] / pd_constructive[1]
+        # self.coefficients[2] = self.constructive[2, 2] / pd_constructive[2]
 
     def testIsotropic(self, horizon_radius, grid_size, inst_len):
         self.__init_std_meshgrid(horizon_radius, grid_size)
         grid_vol = grid_size**2
-        c0, c1, c2 = self.coefficients
-
-        def helper(x, y):
-            phi, xi = np.arctan2(y, x), np.hypot(x, y)
-            scale = c0 + c1 * np.cos(2 * phi) + c2 * np.cos(4 * phi)
-            return scale * np.exp(-xi / inst_len)
-
-        coef_fun = np.vectorize(helper)
+        coef_fun = self.generate_coef(inst_len)
         pd_constructive = pd_stiffness.estimate_stiffness_matrix_isotropic(
             self.__mesh_, coef_fun)
         pd_constructive /= grid_vol
-        print(pd_constructive)
+        ratio = np.diag(self.constructive) / pd_constructive
+        print("ratio=", ratio)
 
 
 if __name__ == "__main__":
