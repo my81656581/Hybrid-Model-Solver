@@ -20,7 +20,6 @@ if __name__ == "__main__":
     example_name = 'example_01'
     # example_name = 'example_02'
 
-
     # input_file = 'data_2100_2000.msh'
     # example_name = 'example-05'
 
@@ -40,12 +39,14 @@ if __name__ == "__main__":
     # horizon_radius = 0.0045
     meshdata = Mesh2d.HybridMesh2d(n_nodes, n_elements)
     meshdata.manually_construct(np.array(nodes), np.array(elements))
-    meshdata.peridynamic_construct(horizon_radius, 2 * horizon_radius, 4 * horizon_radius)
+    meshdata.peridynamic_construct(horizon_radius, 2 * horizon_radius,
+                                   4 * horizon_radius)
     related = meshdata.bonds
     meshdata.debug_element(50)
 
     # material
-    continuum = Material2d.Material2d(youngs_modulus=3e11, poissons_ratio=1.0 / 3)
+    continuum = Material2d.Material2d(youngs_modulus=3e11,
+                                      poissons_ratio=1.0 / 3)
     material = Material2d.PdMaterial2d(continuum=continuum)
     material.setIsotropic(horizon_radius=horizon_radius)
     # continuum
@@ -63,7 +64,7 @@ if __name__ == "__main__":
     print(material.coefficients)
     print(f"lame parameters: lambda={lame_lambda:.4e}, mu={lame_mu:.4e}")
 
-    coef_c0 = np.vectorize(lambda xi2: c0 * np.exp(-xi2**0.5 / 0.015))
+    coef_c0 = material.generate_coef(inst_len=0.015)
     # coef_c0 = np.vectorize(lambda xi2: c0 * np.exp(-xi2**0.5 / 0.0005))
 
     basis = reference_basis.Quadrilateral4Node()
@@ -147,7 +148,6 @@ if __name__ == "__main__":
     # treat_boundary.segment_set_ux(a, b, p, boundary_3, +0.1)
     # # treat_boundary.point_set_ux(a, b, p, boundary_4, 0)
 
-
     # example 05, using data_2100_2000.msh
     # |  +  +  +  +  +  >
     # |  +  +  +  +  +  >
@@ -180,7 +180,6 @@ if __name__ == "__main__":
     #     ("segment", "set_ux", "constant", boundary_2, tension),
     # ]
 
-
     # compiled_boundary = treat_boundary.complie_boundary(p, boundarys)
     # treat_boundary.apply_boundary(a, b, p, compiled_boundary)
 
@@ -196,16 +195,24 @@ if __name__ == "__main__":
     p_deform = postprocessing.get_deform_mesh(p, u)
     epsilon = postprocessing.get_strain_field(p, t, basis, u)
     sigma = postprocessing.get_stress_field(constructive, epsilon)
-    w_distortion = postprocessing.get_distortion_energy(youngs_modulus, poissons_ratio, sigma)
+    w_distortion = postprocessing.get_distortion_energy(
+        youngs_modulus, poissons_ratio, sigma)
 
     # without deformation
-    tecplot_config = postprocessing.generate_tecplot_config(n_nodes, n_elements, basis.length)
-    tecplot_config["variables"] = "X, Y, Ux, Uy, Uabs, epsilon_x, epsilon_y, epsilon_xy, sigma_x, sigma_y, sigma_xy, w_distortion"
-    postprocessing.export_tecplot_data(f"{example_name}-pd-{n_nodes}-nodes.dat", tecplot_config, p, t, u, u_abs, epsilon, sigma, w_distortion)
+    tecplot_config = postprocessing.generate_tecplot_config(
+        n_nodes, n_elements, basis.length)
+    tecplot_config[
+        "variables"] = "X, Y, Ux, Uy, Uabs, epsilon_x, epsilon_y, epsilon_xy, sigma_x, sigma_y, sigma_xy, w_distortion"
+    postprocessing.export_tecplot_data(
+        f"{example_name}-pd-{n_nodes}-nodes.dat", tecplot_config, p, t, u,
+        u_abs, epsilon, sigma, w_distortion)
 
     # containing deformation
-    deform_config = postprocessing.generate_tecplot_config(n_nodes, n_elements, basis.length)
+    deform_config = postprocessing.generate_tecplot_config(
+        n_nodes, n_elements, basis.length)
     deform_config["variables"] = "X, Y, Ux, Uy, Uabs"
-    postprocessing.export_tecplot_data(f"{example_name}-pd-{n_nodes}-nodes-deform.dat", deform_config, p_deform, t, u, u_abs)
+    postprocessing.export_tecplot_data(
+        f"{example_name}-pd-{n_nodes}-nodes-deform.dat", deform_config,
+        p_deform, t, u, u_abs)
 
     # deal_bond_stretch(p, t, related, u, coef_c0, basis)
