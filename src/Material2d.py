@@ -1,8 +1,8 @@
 import numpy as np
 
-from generate_mesh import build_mesh
 from Mesh2d import PrototypePdMesh2d
-import pd_stiffness
+from generate_mesh import build_mesh
+from pd_stiffness import estimate_stiffness_matrix
 
 
 class Material2d(object):
@@ -66,6 +66,7 @@ class PdMaterial2d(Material2d):
     def generate_coef(self):
         c0, c1, c2 = self.coefficients
         inst_len = self.inst_len
+
         def helper(x, y):
             # phi = np.arctan2(y, x)
             xi = np.hypot(x, y)
@@ -78,27 +79,24 @@ class PdMaterial2d(Material2d):
     def setIsotropic(self, horizon_radius, grid_size, inst_len):
         self.__horizon_radius_ = horizon_radius
         self.__grid_size_ = grid_size
-        self.__inst_len_ = inst_len 
+        self.__inst_len_ = inst_len
         self.__syncIsotropic()
 
     def __syncIsotropic(self):
         self.__init_std_meshgrid()
         grid_vol = self.grid_size**2
         coef_fun = self.generate_coef()
-        pd_constitutive = pd_stiffness.estimate_stiffness_matrix_isotropic(
-            self.__mesh_, coef_fun)
+        pd_constitutive = estimate_stiffness_matrix(self.__mesh_, coef_fun)
         pd_constitutive /= grid_vol
         self.coefficients = np.diag(self.constitutive) / pd_constitutive
         coef_fun = self.generate_coef()
-        pd_constitutive = pd_stiffness.estimate_stiffness_matrix_isotropic(
-            self.__mesh_, coef_fun)
+        pd_constitutive = estimate_stiffness_matrix(self.__mesh_, coef_fun)
         pd_constitutive /= grid_vol
         ratio = np.diag(self.constitutive) / pd_constitutive
         print("Synchronize Complete. Ratio=", ratio)
         print("Constitutive: (C11, C22, C33)=", np.diag(self.constitutive))
         print("Peridynamic:  (C11, C22, C33)=", pd_constitutive)
 
-    
     @property
     def coefficients(self):
         return self.__coefficients_
