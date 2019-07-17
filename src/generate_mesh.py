@@ -12,11 +12,8 @@ def build_mesh(x_config, y_config):
     ]
     mX, mY = np.meshgrid(xv, yv)
     p = [_ for _ in zip(mX.flat, mY.flat)]
-    ids = np.array(range(nx * ny)).reshape((ny, nx))
-    e = [
-        _ for _ in zip(ids[:-1, :-1].flat, ids[:-1, 1:].flat,
-                       ids[1:, 1:].flat, ids[1:, :-1].flat)
-    ]
+    i = np.array(range(nx * ny)).reshape((ny, nx))
+    e = [_.flat for _ in zip(i[:-1, :-1], i[:-1, 1:], i[1:, 1:], i[1:, :-1])]
     return p, e
 
 
