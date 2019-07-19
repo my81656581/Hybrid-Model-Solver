@@ -81,7 +81,7 @@ def preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis):
     return det_jacobi
 
 
-def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stf,
+def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stiffsize,
                              gauss_points, constitutive, basis):
     # elastic matrix D := [[d_11, d_12,    0],
     #                      [d_21, d_22,    0],
@@ -100,8 +100,8 @@ def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stf,
         local_basis(x_, y_, vertices, local_jacobi, basis, _, (0, 1))
         for _ in range(basis.length)
     ]
-    for ii in range(n_stf):
-        for jj in range(n_stf):
+    for ii in range(n_stiffsize):
+        for jj in range(n_stiffsize):
             pxgipxgj = pxg[ii] * pxg[jj]
             pygipygj = pyg[ii] * pyg[jj]
             pxgipygj = pxg[ii] * pyg[jj]
@@ -115,9 +115,9 @@ def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stf,
             a6 = np.sum(w_jcb * d_33(x_, y_) * pxgipygj)
             a8 = np.sum(w_jcb * d_33(x_, y_) * pxgipxgj)
             local_stiff[ii, jj] = a1 + a2  # k11
-            local_stiff[ii, jj + n_stf] = a3 + a4  # k12
-            local_stiff[ii + n_stf, jj] = a5 + a6  # k21
-            local_stiff[ii + n_stf, jj + n_stf] = a7 + a8  # k22
+            local_stiff[ii, jj + n_stiffsize] = a3 + a4  # k12
+            local_stiff[ii + n_stiffsize, jj] = a5 + a6  # k21
+            local_stiff[ii + n_stiffsize, jj + n_stiffsize] = a7 + a8  # k22
     return True
 
 
@@ -125,8 +125,8 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
                                  jacobis):
     # print(6, nodes.shape, elements.shape)
     w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
-    n_elements, n_stf = len(elements), basis.length
-    ret = np.zeros((n_elements, 2 * n_stf, 2 * n_stf))
+    n_elements, n_stiffsize = len(elements), basis.length
+    ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
     c11, c12 = constitutive[0, 0], constitutive[0, 1]
     shear_modulus = constitutive[2, 2]
     d_11 = np.vectorize(lambda x, y: c11)
@@ -151,7 +151,7 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
         element_sitffness_matrix(local_stiff=ret[i, :, :],
                                  vertices=nodes[elements[i, :], :],
                                  local_jacobi=jacobis[i],
-                                 n_stf=n_stf,
+                                 n_stiffsize=n_stiffsize,
                                  gauss_points=(w_, x_, y_),
                                  constitutive=(d_11, d_22, d_12, d_33),
                                  basis=basis)
@@ -163,7 +163,7 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
 
 
 def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
-    n_nodes, n_elements, n_stf = len(nodes), len(elements), basis.length
+    n_nodes, n_elements, n_stiffsize = len(nodes), len(elements), basis.length
     ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
@@ -181,13 +181,14 @@ def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
                 start_time=t0)
         # time counter runs end
         ki = ks[i, :, :]
-        for ii in range(n_stf):
-            for jj in range(n_stf):
+        for ii in range(n_stiffsize):
+            for jj in range(n_stiffsize):
                 _i, _j = elements[i, ii], elements[i, jj]
                 ret[_i, _j] += ki[ii, jj]
-                ret[_i, _j + n_nodes] += ki[ii, jj + n_stf]
-                ret[_i + n_nodes, _j] += ki[ii + n_stf, jj]
-                ret[_i + n_nodes, _j + n_nodes] += ki[ii + n_stf, jj + n_stf]
+                ret[_i, _j + n_nodes] += ki[ii, jj + n_stiffsize]
+                ret[_i + n_nodes, _j] += ki[ii + n_stiffsize, jj]
+                ret[_i + n_nodes, _j + n_nodes] += ki[ii + n_stiffsize, jj +
+                                                      n_stiffsize]
     # time counter summary begin
     tot = time.time() - t0
     print(f"        assembling completed. Total {utils.formatting_time(tot)}")
@@ -197,7 +198,7 @@ def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
 
 def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
                                                  weight_handle, basis, ks):
-    n_nodes, n_elements, n_stf = len(nodes), len(elements), basis.length
+    n_nodes, n_elements, n_stiffsize = len(nodes), len(elements), basis.length
     ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
@@ -217,13 +218,14 @@ def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
         if flag_i == 1: continue
         di = (1 - weight_i(*centers[i])) * ks[i, :, :]
         # time counter runs end
-        for ii in range(n_stf):
-            for jj in range(n_stf):
+        for ii in range(n_stiffsize):
+            for jj in range(n_stiffsize):
                 _i, _j = elements[i, ii], elements[i, jj]
                 ret[_i, _j] += di[ii, jj]
-                ret[_i, _j + n_nodes] += di[ii, jj + n_stf]
-                ret[_i + n_nodes, _j] += di[ii + n_stf, jj]
-                ret[_i + n_nodes, _j + n_nodes] += di[ii + n_stf, jj + n_stf]
+                ret[_i, _j + n_nodes] += di[ii, jj + n_stiffsize]
+                ret[_i + n_nodes, _j] += di[ii + n_stiffsize, jj]
+                ret[_i + n_nodes, _j + n_nodes] += di[ii + n_stiffsize, jj +
+                                                      n_stiffsize]
     # time counter summary begin
     tot = time.time() - t0
     print(
