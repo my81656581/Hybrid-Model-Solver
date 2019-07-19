@@ -61,36 +61,6 @@ def local_basis(x_gauss, y_gauss, vertices, local_jacobi: np.ndarray,
         return basis.highorder[basis_idx](x_gauss, y_gauss)
 
 
-def preprocessing_jacobi_old(x_gauss, y_gauss, vertices,
-                             basis: reference_basis.Quadrilateral4Node):
-    x_local, y_local = [vertices[:, _] for _ in (0, 1)]
-    dndxg = np.hstack([_(x_gauss, y_gauss) for _ in basis.shapes_dx])
-    dndyg = np.hstack([_(x_gauss, y_gauss) for _ in basis.shapes_dy])
-    dxdxg = dndxg @ x_local
-    dydxg = dndxg @ y_local
-    dxdyg = dndyg @ x_local
-    dydyg = dndyg @ y_local
-    jacobis = np.array([
-        np.array([[_11, _12], [_21, _22]])
-        # np.linalg.inv(np.array([[_11, _21], [_12, _22]]))
-        for _11, _12, _21, _22 in zip(dxdxg, dxdyg, dydxg, dydyg)
-    ])
-    # print(0, "vertices", vertices.shape, vertices)
-    # print(0, "x_local", x_local.shape, x_local)
-    # print(0, "y_local", y_local.shape, y_local)
-    # print(0, "x_gauss", x_gauss.shape, x_gauss)
-    # print(0, "y_gauss", y_gauss.shape, y_gauss)
-    # print(0, "dndxg", dndxg.shape, dndxg)
-    # print(0, "dndyg", dndyg.shape, dndyg)
-    # print(0, "dxdxg", dxdxg.shape, dxdxg)
-    # print(0, "dydxg", dydxg.shape, dydxg)
-    # print(0, "dxdyg", dxdyg.shape, dxdyg)
-    # print(0, "dydyg", dydyg.shape, dydyg)
-    # print(0, "jacobis", jacobis.shape, jacobis)
-    # jacobis.shape= (4, 2, 2), because of 4 gauss points
-    return jacobis
-
-
 def preprocessing_jacobi(x_gauss, y_gauss, vertices,
                          basis: reference_basis.Quadrilateral4Node):
     dxdxg, dydxg = basis.transform(x_gauss, y_gauss, vertices, (1, 0))
