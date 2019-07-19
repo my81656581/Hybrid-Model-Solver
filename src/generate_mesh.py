@@ -29,6 +29,5 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print('Output filename Needed.')
         exit()
-    # p, e = build_mesh((0, 3.024e-6, 0.168e-6), (0, 2.016e-6, 0.112e-6))
-    p, e = build_mesh((0, 3.024e-6, 0.084e-6), (0, 2.016e-6, 0.084e-6))
+    p, e = build_mesh((0, 1, 0.02), (0, 1, 0.02))
     save_mesh(sys.argv[1], (p, e))
