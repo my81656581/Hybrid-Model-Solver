@@ -1,15 +1,10 @@
 import numpy as np
 
-import utils
+import geometry
 
-EPS = utils.EPS
-SPACING = utils.SPACING
-BIG = utils.BIG
-
-
-def __xmult(a, b, c):
-    # (b - a) x (c - a)
-    return (a[0] - b[0]) * (c[1] - b[1]) - (c[0] - b[0]) * (a[1] - b[1])
+EPS = geometry.EPS
+SPACING = geometry.SPACING
+BIG = geometry.BIG
 
 
 def __set_zero(stiffness, load, idx, val):
@@ -32,16 +27,18 @@ def __nop(a, b, c, d):
 
 def point_criteria(x0, y0):
     def criteria(x, y):
-        return utils.is_zero(x - x0) and utils.is_zero(y - y0)
+        return geometry.is_zero(x - x0) and geometry.is_zero(y - y0)
 
     return criteria
 
 
 def segment_criteria(x_start, y_start, x_end, y_end):
     def criteria(x, y):
-        return utils.is_zero(__xmult(
-            (x, y), (x_start, y_start), (x_end, y_end))) and (x_start - x) * (
-                x_end - x) < EPS and (y_start - y) * (y_end - y) < EPS
+        return geometry.is_zero(
+            geometry.xmult(
+                (x, y), (x_start, y_start),
+                (x_end, y_end))) and (x_start - x) * (x_end - x) < EPS and (
+                    y_start - y) * (y_end - y) < EPS
 
     return criteria
 
@@ -65,13 +62,13 @@ def segment_setting(nodes, criteria):
 
 def just_set_point(stiffness, load, nodes, target, fixed_ux, fixed_uy):
     n_nodes = len(nodes)
-    apply_ux, apply_uy = [
-        (__set_zero if utils.is_zero(_) else __set_value) if _ != None else __nop
-        for _ in [fixed_ux, fixed_uy]
-    ]
+    apply_ux, apply_uy = [(__set_zero if geometry.is_zero(_) else __set_value)
+                          if _ != None else __nop
+                          for _ in [fixed_ux, fixed_uy]]
     apply_ux(stiffness, load, target, fixed_ux)
     apply_uy(stiffness, load, target + n_nodes, fixed_uy)
     return True
+
 
 def just_fixed_point(stiffness, load, nodes, target):
     return just_set_point(stiffness, load, nodes, target, 0, 0)
@@ -189,4 +186,3 @@ def apply_boundary(stiffness, loads, nodes, complied_boundary, scale = 1.0):
         else:
             print(f"Wrong boundary configs. No such entry named {cond[0]}")
             print("Apply Failed.")
-

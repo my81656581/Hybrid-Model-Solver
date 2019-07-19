@@ -2,15 +2,6 @@ import numpy as np
 import math
 import time
 
-# EPS = np.spacing(10)
-EPS = 1e-8
-SPACING = 10 * EPS
-BIG = 1e10
-
-
-def is_zero(x):
-    return np.abs(x) < EPS
-
 
 def debug(func):
     """debug wrapper
