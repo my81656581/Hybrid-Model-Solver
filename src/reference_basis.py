@@ -126,13 +126,12 @@ class Quadrilateral4Node(__IShapeable, __IShapeDxable, __IShapeDyable,
         else:
             transform_function = self.highorder
         x_, y_ = [vertices[:, _] for _ in (0, 1)]
-        shape = np.hstack([transform_function[_](x, y) for _ in range(self.length)])
+        shape = np.hstack(
+            [transform_function[_](x, y) for _ in range(self.length)])
         return shape @ x_, shape @ y_
 
     def shape_vector(self, x, y):
         return np.hstack([self.shapes[_](x, y) for _ in range(self.length)])
-
-
 
 
 if __name__ == "__main__":
