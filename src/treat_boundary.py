@@ -83,22 +83,21 @@ def just_set_point_uy(stiffness, load, nodes, target, fixed_uy):
 
 
 def just_set_point_ux_by_lambda(stiffness, load, nodes, target, fixed_ux):
-    __set_value(stiffness, load, target, fixed_ux(*nodes[idx, :]))
+    __set_value(stiffness, load, target, fixed_ux(*nodes[target, :]))
     return True
 
 
 def just_set_point_uy_by_lambda(stiffness, load, nodes, target, fixed_uy):
-    n_nodes = len(nodes)
-    __set_value(stiffness, load, target + len(nodes), fixed_ux(*nodes[idx, :]))
+    __set_value(stiffness, load, target + len(nodes),
+                fixed_uy(*nodes[target, :]))
     return True
 
 
 def just_set_segment(stiffness, load, nodes, targets, fixed_ux, fixed_uy):
     n_nodes, ret = len(nodes), False
-    apply_ux, apply_uy = [
-        (__set_zero if utils.is_zero(_) else __set_value) if _ != None else __nop
-        for _ in [fixed_ux, fixed_uy]
-    ]
+    apply_ux, apply_uy = [(__set_zero if geometry.is_zero(_) else __set_value)
+                          if _ != None else __nop
+                          for _ in [fixed_ux, fixed_uy]]
     for idx in targets:
         apply_ux(stiffness, load, idx, fixed_ux)
         apply_uy(stiffness, load, idx + n_nodes, fixed_uy)
@@ -119,7 +118,7 @@ def just_set_segment_uy(stiffness, load, nodes, targets, fixed_uy):
 
 
 def just_set_segment_ux_by_lambda(stiffness, load, nodes, targets, fixed_ux):
-    n_nodes, ret = len(nodes), False
+    ret = False
     for idx in targets:
         __set_value(stiffness, load, idx, fixed_ux(*nodes[idx, :]))
         if not ret: ret = True
@@ -139,16 +138,17 @@ def complie_boundary(nodes, conditions):
     for cond in conditions:
         if cond[0] == "point":
             indices.append(point_setting(nodes, cond[3]))
-        elif cond[0] == "segment": 
+        elif cond[0] == "segment":
             indices.append(segment_setting(nodes, cond[3]))
         else:
             print(f"Wrong boundary configs. No such entry named {cond[0]}")
             print("Compile Failed.")
-    ret = [(config, index[0]) for config, index in zip(conditions, indices) if index[-1]]
+    ret = [(config, index[0]) for config, index in zip(conditions, indices)
+           if index[-1]]
     return ret
 
 
-def apply_boundary(stiffness, loads, nodes, complied_boundary, scale = 1.0):
+def apply_boundary(stiffness, loads, nodes, complied_boundary, scale=1.0):
     for cond, index in complied_boundary:
         # print(cond, index)
         if cond[0] == "point":
@@ -156,14 +156,20 @@ def apply_boundary(stiffness, loads, nodes, complied_boundary, scale = 1.0):
                 just_fixed_point(stiffness, loads, nodes, index)
             elif cond[1] == "set_ux":
                 if cond[2] == "constant":
-                    just_set_point_ux(stiffness, loads, nodes, index, scale * cond[4])
+                    just_set_point_ux(stiffness, loads, nodes, index,
+                                      scale * cond[4])
                 elif cond[2] == "lambda":
-                    just_set_point_ux_by_lambda(stiffness, loads, nodes, index, lambda x, y: scale * cond[4](x, y))
+                    just_set_point_ux_by_lambda(
+                        stiffness, loads, nodes,
+                        index, lambda x, y: scale * cond[4](x, y))
             elif cond[1] == "set_uy":
                 if cond[2] == "constant":
-                    just_set_point_uy(stiffness, loads, nodes, index, scale * cond[4])
+                    just_set_point_uy(stiffness, loads, nodes, index,
+                                      scale * cond[4])
                 elif cond[2] == "lambda":
-                    just_set_point_uy_by_lambda(stiffness, loads, nodes, index, lambda x, y: scale * cond[4](x, y))
+                    just_set_point_uy_by_lambda(
+                        stiffness, loads, nodes,
+                        index, lambda x, y: scale * cond[4](x, y))
             else:
                 print("Wrong boundary configs.")
                 print("Apply Point Config Failed.")
@@ -172,14 +178,20 @@ def apply_boundary(stiffness, loads, nodes, complied_boundary, scale = 1.0):
                 just_fixed_segment(stiffness, loads, nodes, index)
             elif cond[1] == "set_ux":
                 if cond[2] == "constant":
-                    just_set_segment_ux(stiffness, loads, nodes, index, scale * cond[4])
+                    just_set_segment_ux(stiffness, loads, nodes, index,
+                                        scale * cond[4])
                 elif cond[2] == "lambda":
-                    just_set_segment_ux_by_lambda(stiffness, loads, nodes, index, lambda x, y: scale * cond[4](x, y))
+                    just_set_segment_ux_by_lambda(
+                        stiffness, loads, nodes,
+                        index, lambda x, y: scale * cond[4](x, y))
             elif cond[1] == "set_uy":
                 if cond[2] == "constant":
-                    just_set_segment_uy(stiffness, loads, nodes, index, scale * cond[4])
+                    just_set_segment_uy(stiffness, loads, nodes, index,
+                                        scale * cond[4])
                 elif cond[2] == "lambda":
-                    just_set_segment_uy_by_lambda(stiffness, loads, nodes, index, lambda x, y: scale * cond[4](x, y))
+                    just_set_segment_uy_by_lambda(
+                        stiffness, loads, nodes,
+                        index, lambda x, y: scale * cond[4](x, y))
             else:
                 print("Wrong boundary configs.")
                 print("Apply Segment Config Failed.")
