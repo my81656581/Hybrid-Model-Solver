@@ -113,7 +113,7 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
         #     print("center_i=", np.mean(nodes[elements[i, :], :], 0))
         #     print("aphla(i)=", weight_i(*np.mean(nodes[elements[i, :], :], 0)))
         #     print("constitutive=", (pd_constitutive_ij[0], pd_constitutive_ij[1], pd_constitutive_ij[2], pd_constitutive_ij[2]))
-        stiffness.generate_element_sitffness_matrix_base(
+        stiffness.element_sitffness_matrix(
             local_stiff=ret[i, :, :],
             vertices=nodes[elements[i, :], :],
             local_jacobi=jacobis[i],
