@@ -1,4 +1,7 @@
-from typing import Callable, List, Tuple
+from typing import List, Tuple
+
+__all__ = ['read_mesh', 'convert_gmsh_into_msh']
+
 
 def read_mesh(mesh_data_file: str) -> Tuple[int, int, List, List]:
     n_nodes, n_elements = 0, 0
@@ -41,7 +44,3 @@ def convert_gmsh_into_msh(gmsh_data_file: str, export_file: str):
             print(len(_), file=fout)
             [print("\t".join(map(str, __)), file=fout) for __ in _]
     return n_nodes, n_elements
-
-if __name__ == '__main__':
-    a, b = convert_gmsh_into_msh("pre-crack.msh", "data.msh")
-    print(a, b)

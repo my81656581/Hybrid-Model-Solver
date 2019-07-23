@@ -1,15 +1,20 @@
 import numpy as np
 import time
 
-import utils
+import hmsolver.utils as utils
 
-import reference_basis
-import gaussint
+from hmsolver.femcore.gaussint import gauss_point_quadrature_standard
+
+__all__ = [
+    'local_basis', 'element_sitffness_matrix', 'preprocessing_jacobi',
+    'preprocessing_all_jacobi', 'preprocessing_all_jacobi_det',
+    'generate_stiffness_matrix_k0', 'mapping_element_stiffness_matrix',
+    'mapping_element_stiffness_matrix_with_weight'
+]
 
 
-def local_basis(x_gauss, y_gauss, vertices, local_jacobi: np.ndarray,
-                basis: reference_basis.Quadrilateral4Node, basis_idx,
-                diff_order):
+def local_basis(x_gauss, y_gauss, vertices, local_jacobi: np.ndarray, basis,
+                basis_idx, diff_order):
     dx, dy = diff_order
     assert dx >= 0 & dy >= 0
     # jacobi = [[pxpxg, pxpyg],
@@ -49,8 +54,7 @@ def local_basis(x_gauss, y_gauss, vertices, local_jacobi: np.ndarray,
         return basis.highorder[basis_idx](x_gauss, y_gauss)
 
 
-def preprocessing_jacobi(x_gauss, y_gauss, vertices,
-                         basis: reference_basis.Quadrilateral4Node):
+def preprocessing_jacobi(x_gauss, y_gauss, vertices, basis):
     dxdxg, dydxg = basis.transform(x_gauss, y_gauss, vertices, (1, 0))
     dxdyg, dydyg = basis.transform(x_gauss, y_gauss, vertices, (0, 1))
     dxdxg, dxdyg, dydxg, dydyg = [
@@ -65,7 +69,7 @@ def preprocessing_jacobi(x_gauss, y_gauss, vertices,
 
 
 def preprocessing_all_jacobi(nodes, elements, basis):
-    w_, x_gauss, y_gauss = gaussint.gauss_point_quadrature_standard()
+    x_gauss, y_gauss = gauss_point_quadrature_standard()[1:]
     n_elements = len(elements)
     return [
         preprocessing_jacobi(x_gauss, y_gauss, nodes[elements[_, :], :], basis)
@@ -124,7 +128,7 @@ def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stiffsize,
 def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
                                  jacobis):
     # print(6, nodes.shape, elements.shape)
-    w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
+    w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_stiffsize = len(elements), basis.length
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
     c11, c12 = constitutive[0, 0], constitutive[0, 1]

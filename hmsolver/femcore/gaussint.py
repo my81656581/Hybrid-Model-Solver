@@ -1,6 +1,13 @@
 import numpy as np
 
-GAUSS_XW_DICT = {
+__all__ = [
+    'gauss_point_linear',
+    'gauss_point_quadrature',
+    'gauss_point_quadrature_standard'
+]
+
+
+__GAUSS_XW_DICT_ = {
     1: (np.array([[-0.5773502692], [+0.5773502692]]),
         np.array([[+1.0000000000], [+1.0000000000]])),
     2: (np.array([[-0.7745966692], [+0.0000000000], [+0.7745966692]]),
@@ -32,14 +39,15 @@ GAUSS_XW_DICT = {
 }
 
 
-def gauss_point_linear(a: float, b: float, order: int = 1) -> (np.ndarray, np.ndarray):
+def gauss_point_linear(a, b, order: int = 1):
     assert 1 <= order <= 7
-    x, w = GAUSS_XW_DICT[order]
+    x, w = __GAUSS_XW_DICT_[order]
     f = np.vectorize(lambda t: (b - a) / 2 * t)
     g = np.vectorize(lambda t: f(t) + (b + a) / 2)
     return (f(w), g(x))
 
-def gauss_point_quadrature(x1: float, x2: float, y1: float, y2: float, order: int = 1) -> (np.ndarray, np.ndarray, np.ndarray):
+
+def gauss_point_quadrature(x1, x2, y1, y2, order: int = 1):
     assert 1 <= order <= 7
     u, x = gauss_point_linear(x1, x2, order)
     v, y = gauss_point_linear(y1, y2, order)
@@ -48,10 +56,10 @@ def gauss_point_quadrature(x1: float, x2: float, y1: float, y2: float, order: in
     return (w_, x_, y_)
 
 
-def gauss_point_quadrature_standard(order: int = 1) -> (np.ndarray, np.ndarray, np.ndarray):
+def gauss_point_quadrature_standard(order: int = 1):
     assert 1 <= order <= 7
-    x, u = GAUSS_XW_DICT[order]
-    y, v = GAUSS_XW_DICT[order]
+    x, u = __GAUSS_XW_DICT_[order]
+    y, v = __GAUSS_XW_DICT_[order]
     x_, y_ = [np.reshape(_, (-1, 1)) for _ in np.meshgrid(x, y)]
     w_ = np.reshape(v @ u.T, (-1, 1))
     return (w_, x_, y_)

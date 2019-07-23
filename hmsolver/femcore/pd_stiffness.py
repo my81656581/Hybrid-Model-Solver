@@ -1,11 +1,18 @@
 import numpy as np
 import time
 
-import utils
+import hmsolver.utils as utils
 
-import gaussint
-import stiffness
-import reference_basis
+from hmsolver.femcore.gaussint import gauss_point_quadrature_standard
+from hmsolver.femcore.stiffness import preprocessing_all_jacobi
+from hmsolver.femcore.stiffness import preprocessing_all_jacobi_det
+from hmsolver.femcore.stiffness import element_sitffness_matrix
+
+__all__ = [
+    'core_xi2', 'pd_constitutive_core', 'estimate_stiffness_matrix',
+    'generate_stiffness_matrix_k1', 'assemble_stiffness_matrix',
+    'assemble_stiffness_matrix_with_weight', 'deal_bond_stretch'
+]
 
 
 def core_xi2(xi, yi, xj, yj, coef_fun):
@@ -31,18 +38,16 @@ def pd_constitutive_core(xi, yi, xj, yj, coef_fun):
     return coef_fun(dx, dy) * pd_constitutive_
 
 
-def estimate_stiffness_matrix(mesh, coef_fun):
+def estimate_stiffness_matrix(mesh, basis, coef_fun):
     nodes, elements, related = mesh.nodes, mesh.elements, mesh.related
-    w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
-    basis = reference_basis.Quadrilateral4Node()
+    w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_gauss = len(elements), len(w_)
-    jacobis = stiffness.preprocessing_all_jacobi(nodes, elements, basis)
+    jacobis = preprocessing_all_jacobi(nodes, elements, basis)
     xy_local = [
         basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
+    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     i = n_elements // 2
     xi_local, yi_local = xy_local[i]
     pd_constitutive = np.array([0.0, 0.0, 0.0])
@@ -61,15 +66,14 @@ def estimate_stiffness_matrix(mesh, coef_fun):
 
 def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
                                  coef_fun, basis, jacobis):
-    w_, x_, y_ = gaussint.gauss_point_quadrature_standard()
+    w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_stiffsize, n_gauss = len(elements), basis.length, len(w_)
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
     xy_local = [
         basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
+    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
     t0 = time.time()
@@ -113,14 +117,13 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
         #     print("center_i=", np.mean(nodes[elements[i, :], :], 0))
         #     print("aphla(i)=", weight_i(*np.mean(nodes[elements[i, :], :], 0)))
         #     print("constitutive=", (pd_constitutive_ij[0], pd_constitutive_ij[1], pd_constitutive_ij[2], pd_constitutive_ij[2]))
-        stiffness.element_sitffness_matrix(
-            local_stiff=ret[i, :, :],
-            vertices=nodes[elements[i, :], :],
-            local_jacobi=jacobis[i],
-            n_stiffsize=n_stiffsize,
-            gauss_points=(w_, x_, y_),
-            constitutive=(d_11, d_22, d_12, d_33),
-            basis=basis)
+        element_sitffness_matrix(local_stiff=ret[i, :, :],
+                                 vertices=nodes[elements[i, :], :],
+                                 local_jacobi=jacobis[i],
+                                 n_stiffsize=n_stiffsize,
+                                 gauss_points=(w_, x_, y_),
+                                 constitutive=(d_11, d_22, d_12, d_33),
+                                 basis=basis)
     # time counter summary begin
     tot = time.time() - t0
     print(f"        generating completed. Total {utils.formatting_time(tot)}")
@@ -129,7 +132,7 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
 
 
 def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
-    w_, x_gauss, y_gauss = gaussint.gauss_point_quadrature_standard()
+    w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
     ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
     zero1x4 = np.zeros(shape=(1, 4))
@@ -141,9 +144,8 @@ def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
-    jacobis = stiffness.preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
+    jacobis = preprocessing_all_jacobi(nodes, elements, basis)
+    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)
@@ -234,7 +236,7 @@ def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
 
 def assemble_stiffness_matrix_with_weight(nodes, elements, related,
                                           weight_handle, coef_fun, basis):
-    w_, x_gauss, y_gauss = gaussint.gauss_point_quadrature_standard()
+    w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
     ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
     zero1x4 = np.zeros(shape=(1, 4))
@@ -246,9 +248,8 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
-    jacobis = stiffness.preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
+    jacobis = preprocessing_all_jacobi(nodes, elements, basis)
+    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)
@@ -333,7 +334,7 @@ def deal_bond_stretch(nodes,
                       coef_fun,
                       basis,
                       s_crit=1.1):
-    w_, x_gauss, y_gauss = gaussint.gauss_point_quadrature_standard()
+    w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
     zero1x4 = np.zeros(shape=(1, 4))
     endpoints, broken_bond_cnt = [], 0
@@ -349,9 +350,8 @@ def deal_bond_stretch(nodes,
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
-    jacobis = stiffness.preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = stiffness.preprocessing_all_jacobi_det(
-        n_elements, n_gauss, jacobis)
+    jacobis = preprocessing_all_jacobi(nodes, elements, basis)
+    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)

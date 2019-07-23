@@ -1,14 +1,21 @@
 import numpy as np
-from typing import Callable, Dict, List, Tuple
+from typing import Dict
 import sys
 
-import utils
+import hmsolver.utils as utils
 
-import reference_basis
-from stiffness import preprocessing_jacobi
-from geometry import xmult
+from hmsolver.femcore.stiffness import preprocessing_jacobi
+from hmsolver.geometry import xmult
 
-REFERENCE_VERTICES = np.array([[-1, -1], [+1, -1], [-1, +1], [+1, +1]])
+__all__ = [
+    'get_absolute_displace', 'get_deform_mesh', 'get_strain_field',
+    'get_stress_field', 'get_distortion_energy',
+    'convert_distortion_energy_for_element',
+    'maximum_distortion_energy_criterion', 'generate_tecplot_config',
+    'export_tecplot_data'
+]
+
+__REFERENCE_VERTICES_ = np.array([[-1, -1], [+1, -1], [-1, +1], [+1, +1]])
 
 
 def get_absolute_displace(displace_field):
@@ -34,7 +41,7 @@ def get_strain_field(nodes, elements, basis, displace_field):
     n_nodes, n_elements, n_basis = len(nodes), len(elements), basis.length
     strain_field = np.zeros(shape=(n_nodes, 3))
     frequent = np.zeros(shape=(n_nodes, 1))
-    xg, yg = REFERENCE_VERTICES.T
+    xg, yg = __REFERENCE_VERTICES_.T
     xg, yg = [np.reshape(_, (-1, 1)) for _ in [xg, yg]]
     for i in range(n_elements):
         jacobi = preprocessing_jacobi(xg, yg, nodes[elements[i, :], :], basis)
@@ -93,7 +100,7 @@ def maximum_distortion_energy_criterion(distortion_energy, w_max):
 def generate_tecplot_config(n_nodes: int,
                             n_elements: int,
                             n_localnodes: int = 4,
-                            e_type: str = "QUADRILATERAL"):
+                            e_type: str = "FEQUADRILATERAL"):
     return {
         "title": "Solution",
         "variables": "X, Y, U_x, U_y",
@@ -114,7 +121,7 @@ def export_tecplot_data(export: str, config: Dict, nodes, elements,
         print(f"TITLE= {config['title']}", file=fout)
         print(f"VARIABLES= {config['variables']}", file=fout)
         print(
-            f"ZONE N= {config['n_nodes']}, E= {config['n_elements']}, F= FEPOINT, ET= {config['e_type']}",
+            f"ZONE N= {config['n_nodes']}, E= {config['n_elements']}, DATAPACKING=POINT, ZONETYPE={config['e_type']}",
             file=fout)
         for i in range(config["n_nodes"]):
             print(f"{nodes[i][0]:6f}",
