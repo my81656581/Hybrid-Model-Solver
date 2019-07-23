@@ -5,7 +5,7 @@ import numpy as np
 # import sys
 # sys.path.append('./../../')
 
-from hmsolver.basis.Quad4Node import Quad4Node
+from hmsolver.basis.quad4 import Quad4Node
 
 
 class TestQuad4Node(unittest.TestCase):
