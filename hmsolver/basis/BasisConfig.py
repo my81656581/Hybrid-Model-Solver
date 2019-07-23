@@ -21,8 +21,3 @@ class BasisConfig(object):
     @staticmethod
     def localnodes(e_basistype: int) -> int:
         return BasisConfig.__n_localnodes_map_[e_basistype]
-
-
-if __name__ == "__main__":
-    for e_type in [2301, 2302, 2401, 2402]:
-        print(BasisConfig.localnodes(e_type))
