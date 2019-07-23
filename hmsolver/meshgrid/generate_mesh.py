@@ -13,7 +13,10 @@ def build_mesh(x_config, y_config):
     mX, mY = np.meshgrid(xv, yv)
     p = [_ for _ in zip(mX.flat, mY.flat)]
     i = np.array(range(nx * ny)).reshape((ny, nx))
-    e = [_.flat for _ in zip(i[:-1, :-1], i[:-1, 1:], i[1:, 1:], i[1:, :-1])]
+    e = [
+        _ for _ in zip(i[:-1, :-1].flat, i[:-1, 1:].flat, i[1:, 1:].flat,
+                       i[1:, :-1].flat)
+    ]
     return p, e
 
 
