@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
+# from __future__ import absolute_import
 
-from hmsolver.basis.BasisConfig import BasisConfig
-from hmsolver.basis.Infrastructure import IShapeable, IShapeDxable, IShapeDxDyable, IShapeDyable
-from hmsolver.basis.Quad4Node import Quad4Node
+from . import basisinfo
+from .basisinfo import *
+from . import infrastructures
+from .infrastructures import *
+from . import quad4
+from .quad4 import *
 
-__all__ = [
-    'BasisConfig', 'IShapeable', 'IShapeDxable', 'IShapeDxDyable',
-    'IShapeDyable', 'Quad4Node'
-]
+__all__ = []
+__all__ += basisinfo.__all__
+__all__ += infrastructures.__all__
+__all__ += quad4.__all__

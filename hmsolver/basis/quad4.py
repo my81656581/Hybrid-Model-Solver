@@ -1,6 +1,8 @@
 import numpy as np
 
-from hmsolver.basis.Infrastructure import IShapeable, IShapeDxable, IShapeDxDyable, IShapeDyable
+from hmsolver.basis.infrastructures import IShapeable, IShapeDxable, IShapeDxDyable, IShapeDyable
+
+__all__ = ['Quad4Node']
 
 
 class Quad4Node(IShapeable, IShapeDxable, IShapeDyable, IShapeDxDyable):
@@ -21,6 +23,7 @@ class Quad4Node(IShapeable, IShapeDxable, IShapeDyable, IShapeDxDyable):
         dxdy1 = np.vectorize(lambda a, b: 0.25)
         dxdy2 = np.vectorize(lambda a, b: -0.25)
         high = np.vectorize(lambda a, b: 0)
+        self.typeid = 2401
         self.length = 4
         self.shapes = [n1, n2, n3, n4]
         self.shapes_dx = [dx1, dx2, dx3, dx4]

@@ -5,6 +5,14 @@ __all__ = ['IShapeable', 'IShapeDxable', 'IShapeDxDyable', 'IShapeDyable']
 
 class IShapeable(metaclass=abc.ABCMeta):
     @property
+    def typeid(self) -> int:
+        return self.__typeid_
+
+    @typeid.setter
+    def typeid(self, _: int):
+        self.__typeid_ = _
+
+    @property
     def shapes(self):
         return self.__shapes_
 
@@ -13,11 +21,11 @@ class IShapeable(metaclass=abc.ABCMeta):
         self.__shapes_ = _
 
     @property
-    def length(self):
+    def length(self) -> int:
         return self.__basis_num_
 
     @length.setter
-    def length(self, _):
+    def length(self, _: int):
         self.__basis_num_ = _
 
     @property
