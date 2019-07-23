@@ -10,11 +10,13 @@ __all__ = ['PdMaterial2d']
 
 
 class PdMaterial2d(Material2d):
-    def __init__(self,
-                 continuum: Material2d = Material2d(),
-                 coefficients=np.array([1.0, 1.0, 1.0])):
-        super().__init__(continuum.youngs_modulus, continuum.poissons_ratio)
+    def __init__(self, E, v, coefficients=np.array([1.0, 1.0, 1.0])):
+        super().__init__(E, v)
         self.__coefficients_ = coefficients
+        self.__ready_ = False
+
+    def ready(self):
+        return self.__ready_
 
     def __init_std_meshgrid(self):
         scale = self.horizon_radius // self.grid_size
@@ -44,7 +46,7 @@ class PdMaterial2d(Material2d):
         self.__horizon_radius_ = horizon_radius
         self.__grid_size_ = grid_size
         self.__inst_len_ = inst_len
-        return self.__syncIsotropic()
+        self.__syncIsotropic()
 
     def __syncIsotropic(self):
         self.__init_std_meshgrid()
@@ -61,7 +63,7 @@ class PdMaterial2d(Material2d):
         print("Synchronize Complete. Ratio=", ratio)
         print("Constitutive: (C11, C22, C33)=", np.diag(self.constitutive))
         print("Peridynamic:  (C11, C22, C33)=", pd)
-        return True
+        self.__ready_ = True
 
     @property
     def coefficients(self):
