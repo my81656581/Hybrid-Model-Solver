@@ -9,18 +9,13 @@ from hmsolver.femcore.stiffness import preprocessing_all_jacobi_det
 from hmsolver.femcore.stiffness import element_sitffness_matrix
 
 __all__ = [
-    'core_xi2', 'pd_constitutive_core', 'estimate_stiffness_matrix',
+    'xi2', 'pd_constitutive_core', 'estimate_stiffness_matrix',
     'generate_stiffness_matrix_k1', 'assemble_stiffness_matrix',
     'assemble_stiffness_matrix_with_weight', 'deal_bond_stretch'
 ]
 
 
-def core_xi2(xi, yi, xj, yj, coef_fun):
-    # dx, dy = xi - xj, yi - yj
-    # ds2 = dx**2 + dy**2
-    # dx2, dxdy, dy2 = dx * dx, dx * dy, dy * dy
-    # core_ = np.array([[dx2, dxdy], [dxdy, dy2]])
-    # return coef_fun(ds2) * core_
+def xi2(xi, yi, xj, yj, coef_fun):
     dx, dy = xi - xj, yi - yj
     dx2, dxdy, dy2 = dx * dx, dx * dy, dy * dy
     _ = coef_fun(dx, dy) * np.array([dx2, dy2, dxdy])
@@ -28,10 +23,6 @@ def core_xi2(xi, yi, xj, yj, coef_fun):
 
 
 def pd_constitutive_core(xi, yi, xj, yj, coef_fun):
-    # dx2, dy2 = (xi - xj)**2, (yi - yj)**2
-    # ds2 = dx2 + dy2
-    # pd_constitutive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
-    # return coef_fun(ds2) * pd_constitutive_
     dx, dy = xi - xj, yi - yj
     dx2, dy2 = dx**2, dy**2
     pd_constitutive_ = np.array([dx2**2, dy2**2, dx2 * dy2])
@@ -47,7 +38,7 @@ def estimate_stiffness_matrix(mesh, basis, coef_fun):
         basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     i = n_elements // 2
     xi_local, yi_local = xy_local[i]
     pd_constitutive = np.array([0.0, 0.0, 0.0])
@@ -55,9 +46,9 @@ def estimate_stiffness_matrix(mesh, basis, coef_fun):
         xj_local, yj_local = xy_local[j]
         for k in range(n_gauss):
             for l in range(n_gauss):
-                # scale = w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
+                # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
                 # because of w_[_] == 1
-                scale = det_jacobi[i][k] * det_jacobi[j][l]
+                scale = det_jcb[i][k] * det_jcb[j][l]
                 pd_constitutive += scale * pd_constitutive_core(
                     xi_local[k], yi_local[k], xj_local[l], yj_local[l],
                     coef_fun)
@@ -73,7 +64,7 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
         basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
     t0 = time.time()
@@ -97,13 +88,12 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
             flag_j, weight_j = weight_handle(j)
             if flag_i == 0 and flag_j == 0: continue
             for k in range(n_gauss):
-                alpha_k = weight_i(xi_local[k], yi_local[k])
+                ak = weight_i(xi_local[k], yi_local[k])
                 for l in range(n_gauss):
-                    alpha_l = weight_j(xj_local[l], yj_local[l])
-                    # scale = (alpha_k - alpha_l) * 0.5 * w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
+                    al = weight_j(xj_local[l], yj_local[l])
+                    # scale = (ak - al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
                     # because of w_[_] == 1
-                    scale = (alpha_k + alpha_l
-                             ) * 0.5 * det_jacobi[i][k] * det_jacobi[j][l]
+                    scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
                     pd_constitutive_ij += scale * pd_constitutive_core(
                         xi_local[k], yi_local[k], xj_local[l], yj_local[l],
                         coef_fun)
@@ -111,12 +101,6 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
         d_22 = np.vectorize(lambda x, y: pd_constitutive_ij[1])
         d_12 = np.vectorize(lambda x, y: pd_constitutive_ij[2])
         d_33 = np.vectorize(lambda x, y: pd_constitutive_ij[2])
-        # if weight_i(*np.mean(nodes[elements[i, :], :], 0)) > 0.99:
-        #     print("i=", i)
-        #     print("vertex_i=", nodes[elements[i, :], :])
-        #     print("center_i=", np.mean(nodes[elements[i, :], :], 0))
-        #     print("aphla(i)=", weight_i(*np.mean(nodes[elements[i, :], :], 0)))
-        #     print("constitutive=", (pd_constitutive_ij[0], pd_constitutive_ij[1], pd_constitutive_ij[2], pd_constitutive_ij[2]))
         element_sitffness_matrix(local_stiff=ret[i, :, :],
                                  vertices=nodes[elements[i, :], :],
                                  local_jacobi=jacobis[i],
@@ -145,7 +129,7 @@ def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)
@@ -194,12 +178,12 @@ def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
                 shape_k = shapes[k]
                 for l in range(n_gauss):
                     shape_l = shapes[l]
-                    # scale = w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
-                    scale = det_jacobi[i][k] * det_jacobi[j][l]
+                    # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
+                    scale = det_jcb[i][k] * det_jcb[j][l]
                     # scale = 1
                     # because of w_[_] == 1
-                    core = scale * core_xi2(xi_local[k], yi_local[k],
-                                            xj_local[l], yj_local[l], coef_fun)
+                    core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
+                                       yj_local[l], coef_fun)
                     stiff_ii += shape_k.T @ core @ shape_k
                     stiff_ij += shape_k.T @ core @ shape_l
                     # code without optim
@@ -249,7 +233,7 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)
@@ -280,7 +264,6 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
             np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_i)
         ]
         flag_i, weight_i = weight_handle(i)
-        # debug_flag = True
         for j in related[i]:
             xj_local, yj_local = xy_local[j]
             jj_col, ii_row = [
@@ -294,25 +277,15 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
             if flag_i == 0 and flag_j == 0: continue
             for k in range(n_gauss):
                 shape_k = shapes[k]
-                alpha_k = weight_i(xi_local[k], yi_local[k])
-                # if debug_flag:
-                #     debug_flag = False
-                #     print("i=", i)
-                #     print("j=", j)
-                #     print("det_jacobi[i]=", det_jacobi[i])
-                #     print("det_jacobi[j]=", det_jacobi[j])
-                #     print("(xi_local, yi_local)=", (xi_local, yi_local))
-                #     print("(xj_local, yj_local)=", (xj_local, yj_local))
+                ak = weight_i(xi_local[k], yi_local[k])
                 for l in range(n_gauss):
                     shape_l = shapes[l]
-                    alpha_l = weight_j(xj_local[l], yj_local[l])
-                    # scale = (alpha_k + alpha_l) * 0.5 * w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
+                    al = weight_j(xj_local[l], yj_local[l])
+                    # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
                     # because of w_[_] == 1
-                    # scale = (alpha_k + alpha_l) * 0.5
-                    scale = (alpha_k + alpha_l
-                             ) * 0.5 * det_jacobi[i][k] * det_jacobi[j][l]
-                    core = scale * core_xi2(xi_local[k], yi_local[k],
-                                            xj_local[l], yj_local[l], coef_fun)
+                    scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
+                    core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
+                                       yj_local[l], coef_fun)
                     stiff_ii += shape_k.T @ core @ shape_k
                     stiff_ij += shape_k.T @ core @ shape_l
             ret[ii_row, ii_col] += np.reshape(stiff_ii, (-1))
@@ -351,7 +324,7 @@ def deal_bond_stretch(nodes,
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
-    det_jacobi = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
         np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
         for _ in range(n_gauss)
@@ -377,8 +350,8 @@ def deal_bond_stretch(nodes,
                 total=n_elements,
                 start_time=t0)
         # time counter runs end
-        xi_local, yi_local = xy_local[i]
-        uxi_local, uyi_local = uxuy_local[i]
+        xi, yi = xy_local[i]
+        uxi, uyi = uxuy_local[i]
         mapping_i = mapping[i]
         ii_col, ii_row = [
             np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_i)
@@ -386,8 +359,8 @@ def deal_bond_stretch(nodes,
         flag_i, weight_i = weight_handle(i)
         for j in related[i]:
             bond_break = False
-            xj_local, yj_local = xy_local[j]
-            uxj_local, uyj_local = uxuy_local[j]
+            xj, yj = xy_local[j]
+            uxj, uyj = uxuy_local[j]
             mapping_j = mapping[j]
             jj_col, jj_row = [
                 np.reshape(_, (-1)) for _ in np.meshgrid(mapping_j, mapping_j)
@@ -401,38 +374,31 @@ def deal_bond_stretch(nodes,
             if flag_i == 0 and flag_j == 0: continue
             for k in range(n_gauss):
                 shape_k = shapes[k]
-                alpha_k = weight_i(xi_local[k], yi_local[k])
+                ak = weight_i(xi[k], yi[k])
                 for l in range(n_gauss):
                     if not connection[i, j, k, l]: continue
-                    xi_old_x, xi_old_y = xi_local[k] - xj_local[l], yi_local[
-                        k] - yj_local[l]
-                    xi_new_x, xi_new_y = uxi_local[k] - uxj_local[
-                        l] + xi_old_x, uyi_local[k] - uyj_local[l] + xi_old_y
-                    xi_old_abs = np.sqrt(xi_old_x * xi_old_x +
-                                         xi_old_y * xi_old_y)
-                    xi_new_abs = np.sqrt(xi_new_x * xi_new_x +
-                                         xi_new_y * xi_new_y)
-                    stretch_ijkl = (xi_new_abs - xi_old_abs) / xi_old_abs
+                    b_x, b_y = xi[k] - xj[l], yi[k] - yj[l]
+                    b_nx, b_ny = uxi[k] - uxj[l] + b_x, uyi[k] - uyj[l] + b_y
+                    b_abs = np.sqrt(b_x * b_x + b_y * b_y)
+                    b_nabs = np.sqrt(b_nx * b_nx + b_ny * b_ny)
+                    stretch_ijkl = (b_nabs - b_abs) / b_abs
                     stretch_max = max(stretch_max, stretch_ijkl)
                     if stretch_ijkl <= s_crit:
                         continue
                     # print(f"            element ({i}, {j}) bond ({k}, {l}): stretch= {stretch_ijkl:.2f}, break!!")
                     shape_l = shapes[l]
-                    alpha_l = weight_j(xj_local[l], yj_local[l])
-                    # scale = (alpha_k + alpha_l) * 0.5 * w_[k] * w_[l] * det_jacobi[i][k] * det_jacobi[j][l]
+                    al = weight_j(xj[l], yj[l])
+                    # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
                     # because of w_[_] == 1
-                    # scale = (alpha_k + alpha_l) * 0.25
-                    scale = (
-                        alpha_k + alpha_l
-                    ) * 0.5 * det_jacobi[i][k] * det_jacobi[j][l] * 0.5
-                    core = scale * core_xi2(xi_local[k], yi_local[k],
-                                            xj_local[l], yj_local[l], coef_fun)
+                    # scale = (ak + al) * 0.25
+                    scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
+                    core = scale * xi2(xi[k], yi[k], xj[l], yj[l], coef_fun)
                     stiff_ii -= shape_k.T @ core @ shape_k
                     stiff_ij -= shape_k.T @ core @ shape_l
                     stiff_jj -= shape_l.T @ core @ shape_l
                     broken_bond_cnt += 1
                     connection[i, j, k, l] = False
-                    # connection[j, i, l, k] = False
+                    connection[j, i, l, k] = False
                     bond_break = True
             if bond_break:
                 endpoints.append(i)
