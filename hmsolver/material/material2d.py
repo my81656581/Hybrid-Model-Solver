@@ -4,17 +4,14 @@ __all__ = ['Material2d']
 
 
 class Material2d(object):
-    def __init__(self,
-                 youngs_modulus: float = 3e11,
-                 poissons_ratio: float = 1.0 / 3):
-        c11 = youngs_modulus / (1 - poissons_ratio * poissons_ratio)
-        c12 = c11 * poissons_ratio
-        c33 = youngs_modulus / (1 + poissons_ratio) / 2.0
-        self.__youngs_modulus_ = youngs_modulus
-        self.__poissons_ratio_ = poissons_ratio
+    def __init__(self, E: float = 3e11, v: float = 1.0 / 3):
+        c11 = E / (1 - v * v)
+        c12 = c11 * v
+        c33 = E / (1 + v) / 2.0
+        self.__youngs_modulus_ = E
+        self.__poissons_ratio_ = v
         self.__lame_mu_ = c33
-        self.__lame_lambda_ = c33 * 2.0 * poissons_ratio / (1 -
-                                                            2 * poissons_ratio)
+        self.__lame_lambda_ = c33 * 2.0 * v / (1 - 2 * v)
         self.__constitutive_ = np.array([[c11, c12, 0], [c12, c11, 0],
                                          [0, 0, c33]])
 
