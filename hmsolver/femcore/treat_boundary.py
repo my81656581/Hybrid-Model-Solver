@@ -248,7 +248,7 @@ class Boundary_Conds2d(list):
         self.extend(bconds)
         self.manually_halt()
 
-    def compile_boundary(self, nodes):
+    def compile(self, nodes):
         if not self.is_ready():
             return None
         indices = []
