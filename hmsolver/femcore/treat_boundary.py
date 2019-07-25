@@ -246,8 +246,11 @@ class Boundary_Conds2d(list):
     def __init__(self, *bconds):
         list.__init__([])
         self.extend(bconds)
+        self.manually_halt()
 
     def compile_boundary(self, nodes):
+        if not self.is_ready():
+            return None
         indices = []
         for cond in self:
             if cond.type == "point":
@@ -261,6 +264,15 @@ class Boundary_Conds2d(list):
         ret = [(config, idx[0]) for config, idx in zip(self, indices)
                if idx[-1]]
         return Compiled_Boundary_Conds2d(ret)
+
+    def manually_verify(self):
+        self.__ready_ = True
+
+    def manually_halt(self):
+        self.__ready_ = False
+
+    def is_ready(self):
+        return self.__ready_
 
 
 # def compile_boundary(nodes, conditions):

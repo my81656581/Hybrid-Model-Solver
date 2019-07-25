@@ -7,11 +7,15 @@ __all__ = ['PrototypePdMesh2d']
 
 
 class PrototypePdMesh2d(Mesh2d):
+    def __init__(self, n_nodes: int, n_elements: int, e_basistype: int = 2401):
+        super().__init__(n_nodes, n_elements, e_basistype)
+        self._pdready_ = False
+
     def prototype_construct(self, horizon_radius: float) -> None:
         self.__startup(horizon_radius)
         self._build_dist()
         self.__build_bonds()
-        self._is_pd_ready = True
+        self._pdready_ = True
 
     def __startup(self, horizon_radius) -> None:
         """Startup the peridynamic config.
@@ -22,7 +26,6 @@ class PrototypePdMesh2d(Mesh2d):
             None: By runing this function, the containers will be setted for further use.
         """
         self.__k_horizon_radius_ = horizon_radius
-        self._is_pd_ready = False
         self.bonds = [list() for _ in range(self.n_elements)]
 
     def _build_dist(self) -> None:
@@ -41,8 +44,8 @@ class PrototypePdMesh2d(Mesh2d):
             self.bonds[i].append(j)
             self.bonds[j].append(i)
 
-    def pd_ready(self) -> bool:
-        return self.__is_pd_ready_
+    def is_pdready(self) -> bool:
+        return self.__pdready_
 
     @property
     def bonds(self):
@@ -89,9 +92,9 @@ class PrototypePdMesh2d(Mesh2d):
         self.__k_outer_radius_ = val
 
     @property
-    def _is_pd_ready(self) -> bool:
-        return self.__is_pd_ready_
+    def _pdready_(self) -> bool:
+        return self.__pdready_
 
-    @_is_pd_ready.setter
-    def _is_pd_ready(self, val):
-        self.__is_pd_ready_ = val
+    @_pdready_.setter
+    def _pdready_(self, val):
+        self.__pdready_ = val

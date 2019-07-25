@@ -14,6 +14,7 @@ class Material2d(object):
         self.__lame_lambda_ = c33 * 2.0 * v / (1 - 2 * v)
         self.__constitutive_ = np.array([[c11, c12, 0], [c12, c11, 0],
                                          [0, 0, c33]])
+        self.__ready_ = True
 
     @property
     def youngs_modulus(self):
@@ -38,3 +39,6 @@ class Material2d(object):
     @property
     def constitutive(self):
         return self.__constitutive_
+
+    def is_ready(self):
+        return self.__ready_

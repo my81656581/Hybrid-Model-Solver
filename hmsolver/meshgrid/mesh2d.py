@@ -29,15 +29,15 @@ class Mesh2d(object):
         self.__adjoint_ = [[] for _ in range(n_nodes)]
         self.__x_, self.__y_ = [self.__nodes_[:, _] for _ in range(2)]
         self.__elements_ = np.zeros(shape=(n_elements, 4), dtype=np.int32)
-        self.__is_ready_ = False
+        self.__ready_ = False
 
     def manually_construct(self, nodes: np.ndarray,
                            elements: np.ndarray) -> bool:
-        if not self.ready():
+        if not self.is_ready():
             self.__nodes_ = np.array(nodes)
             self.__elements_ = np.array(elements)
             self.__consturct_adjoint()
-            self.__is_ready_ = True
+            self.__ready_ = True
             return True
         else:
             return False
@@ -53,8 +53,8 @@ class Mesh2d(object):
         self.__frequent_ = np.reshape(
             np.array([len(_) for _ in self.__adjoint_]), (self.n_nodes, 1))
 
-    def ready(self):
-        return self.__is_ready_
+    def is_ready(self):
+        return self.__ready_
 
     @property
     def n_nodes(self):

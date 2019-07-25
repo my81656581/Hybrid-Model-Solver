@@ -19,7 +19,7 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.__startup_weight_function()
         self._build_dist()
         self.__build_bonds()
-        self._is_pd_ready = True
+        self._pdready_ = True
 
     def __startup(self, horizon_radius, inner_radius, outer_radius) -> None:
         """Startup the peridynamic config.
@@ -35,7 +35,7 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.horizon_radius = horizon_radius
         self.inner_radius = inner_radius
         self.outer_radius = outer_radius
-        self._is_pd_ready = False
+        self._pdready_ = False
         self.bonds = [list() for _ in range(self.n_elements)]
 
     def __startup_weight_function(self) -> None:
@@ -106,12 +106,12 @@ class HybridMesh2d(PrototypePdMesh2d):
         return len(todolist)
 
     def manual_set_rule_at_element(self, element_idx: int, *args) -> bool:
-        return False if not self.pd_ready() else self.__put_ruler_at_element(
+        return False if not self.is_pdready() else self.__put_ruler_at_element(
             element_idx, *args)
 
     def manual_set_rule_at_point(self, x_source: float, y_source: float,
                                  *args) -> bool:
-        return False if not self.pd_ready() else self.__put_ruler_at_point(
+        return False if not self.is_pdready() else self.__put_ruler_at_point(
             x_source, y_source, *args)
 
     def weight_function_builder(self, x_source, y_source,
@@ -266,7 +266,7 @@ class HybridMesh2d(PrototypePdMesh2d):
 #     # meshdata.debug_all_elements()
 #     # meshdata.debug_element(2000)
 #     print(1, meshdata.ready())
-#     print(2, meshdata.pd_ready())
+#     print(2, meshdata.is_pdready())
 #     print(3, meshdata.x.shape, meshdata.y.shape)
 #     print(4, meshdata.nodes.shape, meshdata.elements.shape)
 #     print(input_file)
