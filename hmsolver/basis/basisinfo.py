@@ -2,7 +2,7 @@ from collections import namedtuple
 
 __all__ = ['BasisInfo', 'get_localnodes_by_id', 'get_zonetype_by_id']
 
-BasisInfo = namedtuple('BasisInfo', 'id localnodes zonetype')
+BasisInfo = namedtuple('BasisInfo', ['id', 'localnodes', 'zonetype'])
 
 __BASIS_MAP_ = {
     2301: BasisInfo(2301, 3, 'FETRIANGLE'),  # 二维三角形单元 3 节点
