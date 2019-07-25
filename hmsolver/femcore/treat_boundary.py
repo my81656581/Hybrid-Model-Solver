@@ -1,26 +1,18 @@
 import numpy as np
+from collections import namedtuple
 
 import hmsolver.geometry as geometry
 
 __all__ = [
-    'point_criteria',
-    'segment_criteria',
-    'point_setting',
-    'segment_setting',
-    'just_set_point',
-    'just_fixed_point',
-    'just_set_point_ux',
-    'just_set_point_uy',
-    'just_set_point_ux_by_lambda',
-    'just_set_point_uy_by_lambda',
-    'just_set_segment',
-    'just_fixed_segment',
-    'just_set_segment_ux',
-    'just_set_segment_uy',
-    'just_set_segment_ux_by_lambda',
-    'just_set_segment_uy_by_lambda',
-    'complie_boundary',
-    'apply_boundary',
+    'point_criteria', 'segment_criteria', 'find_point', 'find_segment',
+    'just_set_point', 'just_fixed_point', 'just_set_point_ux',
+    'just_set_point_uy', 'just_set_point_ux_uy', 'just_set_point_ux_by_lambda',
+    'just_set_point_uy_by_lambda', 'just_set_point_ux_uy_by_lambda',
+    'just_set_segment', 'just_fixed_segment', 'just_set_segment_ux',
+    'just_set_segment_uy', 'just_set_segment_ux_uy',
+    'just_set_segment_ux_by_lambda', 'just_set_segment_uy_by_lambda',
+    'just_set_segment_ux_uy_by_lambda', 'Boundary_Func', 'Boundary_Cond',
+    'boundary_cond2d', 'Compiled_Boundary_Conds2d', 'Boundary_Conds2d'
 ]
 
 EPS = geometry.EPS
@@ -64,7 +56,7 @@ def segment_criteria(x_start, y_start, x_end, y_end):
     return criteria
 
 
-def point_setting(nodes, criteria):
+def find_point(nodes, criteria):
     n_nodes = len(nodes)
     for idx in range(n_nodes):
         if criteria(*nodes[idx, :]):
@@ -72,7 +64,7 @@ def point_setting(nodes, criteria):
     return (-1, False)
 
 
-def segment_setting(nodes, criteria):
+def find_segment(nodes, criteria):
     n_nodes, ret, flag = len(nodes), [], False
     for idx in range(n_nodes):
         if criteria(*nodes[idx, :]):
@@ -103,14 +95,24 @@ def just_set_point_uy(stiff, load, nodes, target, fixed_uy):
     return just_set_point(stiff, load, nodes, target, None, fixed_uy)
 
 
+def just_set_point_ux_uy(stiff, load, nodes, target, fixed_ux_uy):
+    fixed_ux, fixed_uy = fixed_ux_uy
+    return just_set_point(stiff, load, nodes, target, fixed_ux, fixed_uy)
+
+
 def just_set_point_ux_by_lambda(stiff, load, nodes, target, fixed_ux):
-    __set_value(stiff, load, target, fixed_ux(*nodes[target, :]))
-    return True
+    fixed_ux = fixed_ux(*nodes[target, :])
+    return just_set_point(stiff, load, nodes, target, fixed_ux, None)
 
 
 def just_set_point_uy_by_lambda(stiff, load, nodes, target, fixed_uy):
-    __set_value(stiff, load, target + len(nodes), fixed_uy(*nodes[target, :]))
-    return True
+    fixed_uy = fixed_uy(*nodes[target, :])
+    return just_set_point(stiff, load, nodes, target, None, fixed_uy)
+
+
+def just_set_point_ux_uy_by_lambda(stiff, load, nodes, target, fixed_ux_uy):
+    fixed_ux, fixed_uy = fixed_ux_uy(*nodes[target, :])
+    return just_set_point(stiff, load, nodes, target, fixed_ux, fixed_uy)
 
 
 def just_set_segment(stiff, load, nodes, targets, fixed_ux, fixed_uy):
@@ -137,6 +139,11 @@ def just_set_segment_uy(stiff, load, nodes, targets, fixed_uy):
     return just_set_segment(stiff, load, nodes, targets, None, fixed_uy)
 
 
+def just_set_segment_ux_uy(stiff, load, nodes, targets, fixed_ux_uy):
+    fixed_ux, fixed_uy = fixed_ux_uy
+    return just_set_segment(stiff, load, nodes, targets, fixed_ux, fixed_uy)
+
+
 def just_set_segment_ux_by_lambda(stiff, load, nodes, targets, fixed_ux):
     ret = False
     for idx in targets:
@@ -153,64 +160,159 @@ def just_set_segment_uy_by_lambda(stiff, load, nodes, targets, fixed_uy):
     return ret
 
 
-def complie_boundary(nodes, conditions):
-    indices = []
-    for cond in conditions:
-        if cond[0] == "point":
-            indices.append(point_setting(nodes, cond[3]))
-        elif cond[0] == "segment":
-            indices.append(segment_setting(nodes, cond[3]))
-        else:
-            print(f"Wrong boundary configs. No such entry named {cond[0]}")
-            print("Compile Failed.")
-    ret = [(config, idx[0]) for config, idx in zip(conditions, indices)
-           if idx[-1]]
+def just_set_segment_ux_uy_by_lambda(stiff, load, nodes, targets, fixed_ux_uy):
+    n_nodes, ret = len(nodes), False
+    for idx in targets:
+        fixed_ux, fixed_uy = fixed_ux_uy(*nodes[idx, :])
+        __set_value(stiff, load, idx, fixed_ux)
+        __set_value(stiff, load, idx + n_nodes, fixed_uy)
+        if not ret: ret = True
     return ret
 
 
 __SAPC_ = {
     "set_ux": just_set_point_ux,
-    "set_uy": just_set_point_uy
+    "set_uy": just_set_point_uy,
+    "set_ux_uy": just_set_point_ux_uy
 }  # __SWITCH_APPLY_POINT_CONSTANT_
 
 __SAPL_ = {
     "set_ux": just_set_point_ux_by_lambda,
-    "set_uy": just_set_point_uy_by_lambda
+    "set_uy": just_set_point_uy_by_lambda,
+    "set_ux_uy": just_set_point_ux_uy_by_lambda
 }  # __SWITCH_APPLY_POINT_LAMBDA_
 
 __SASC_ = {
     "set_ux": just_set_segment_ux,
-    "set_uy": just_set_segment_uy
+    "set_uy": just_set_segment_uy,
+    "set_ux_uy": just_set_segment_ux_uy
 }  # __SWITCH_APPLY_SEGMENT_CONSTANT_
 
 __SASL_ = {
     "set_ux": just_set_segment_ux_by_lambda,
-    "set_uy": just_set_segment_uy_by_lambda
+    "set_uy": just_set_segment_uy_by_lambda,
+    "set_ux_uy": just_set_segment_ux_uy_by_lambda
 }  # __SWITCH_APPLY_SEGMENT_LAMBDA_
 
+__SBT_ = {
+    "default": [
+        lambda s:
+        f"Apply Failed. \nWrong boundary configs. No such entry named {s}"
+    ],
+    "point": [
+        "Wrong boundary configs. Apply Point Config Failed.", just_fixed_point,
+        [__SAPC_, __SAPL_]
+    ],
+    "segemt": [
+        "Wrong boundary configs. Apply Segment Config Failed.",
+        just_fixed_segment, [__SASC_, __SASL_]
+    ]
+}  # __SWITCH_BOUNDARY_TYPE_
 
-def apply_boundary(stiff, loads, nodes, complied_boundary, scale=1.0):
-    for cond, idx in complied_boundary:
-        if cond[0] == "point":
-            if cond[1] == "fixed":
-                just_fixed_point(stiff, loads, nodes, idx)
-            elif cond[2] == "constant":
-                __SAPC_[cond[1]](stiff, loads, nodes, idx, scale * cond[4])
-            elif cond[2] == "lambda":
-                __SAPL_[cond[1]](stiff, loads, nodes,
-                                 idx, lambda x, y: scale * cond[4](x, y))
+Boundary_Func = namedtuple('Boundary_Func', ['type', 'method', 'value'])
+Boundary_Cond = namedtuple('Boundary_Cond', ['type', 'criteria', 'app'])
+
+
+def boundary_cond2d(boundary_type, criteria, app_type, method, value):
+    app = Boundary_Func(app_type, method, value)
+    return Boundary_Cond(boundary_type, criteria, app)
+
+
+class Compiled_Boundary_Conds2d(list):
+    def __init__(self, *cbconds):
+        list.__init__([])
+        self.extend(cbconds)
+
+    def apply(self, stiff, loads, nodes, scale=1.0):
+        for cond, idx in self:
+            routine = __SBT_.get(cond[0], __SBT_["default"])
+            if len(routine) == len(__SBT_["default"]):
+                print(routine[0](cond[0]))
             else:
-                print("Wrong boundary configs. Apply Point Config Failed.")
-        elif cond[0] == "segment":
-            if cond[1] == "fixed":
-                just_fixed_segment(stiff, loads, nodes, idx)
-            elif cond[2] == "constant":
-                __SASC_[cond[1]](stiff, loads, nodes, idx, scale * cond[4])
-            elif cond[2] == "lambda":
-                __SASL_[cond[1]](stiff, loads, nodes,
-                                 idx, lambda x, y: scale * cond[4](x, y))
+                if cond[1] == "fixed":
+                    routine[1](stiff, loads, nodes, idx)
+                elif cond[2] == "constant":
+                    routine[2][0][cond[1]](stiff, loads, nodes, idx,
+                                           scale * cond[4])
+                elif cond[2] == "lambda":
+                    routine[2][1][cond[1]](
+                        stiff, loads, nodes,
+                        idx, lambda x, y: scale * cond[4](x, y))
+                else:
+                    print(routine[0])
+
+
+class Boundary_Conds2d(list):
+    def __init__(self, *bconds):
+        list.__init__([])
+        self.extend(bconds)
+
+    def compile_boundary(self, nodes):
+        indices = []
+        for cond in self:
+            if cond.type == "point":
+                indices.append(find_point(nodes, cond.criteria))
+            elif cond.type == "segment":
+                indices.append(find_segment(nodes, cond.criteria))
             else:
-                print("Wrong boundary configs. Apply Segment Config Failed.")
-        else:
-            print(f"Wrong boundary configs. No such entry named {cond[0]}")
-            print("Apply Failed.")
+                print(
+                    f"Wrong boundary configs. No such entry named {cond.type}")
+                print("Compile Failed.")
+        ret = [(config, idx[0]) for config, idx in zip(self, indices)
+               if idx[-1]]
+        return Compiled_Boundary_Conds2d(ret)
+
+
+# def compile_boundary(nodes, conditions):
+#     indices = []
+#     for cond in conditions:
+#         if cond[0] == "point":
+#             indices.append(find_point(nodes, cond[3]))
+#         elif cond[0] == "segment":
+#             indices.append(find_segment(nodes, cond[3]))
+#         else:
+#             print(f"Wrong boundary configs. No such entry named {cond[0]}")
+#             print("Compile Failed.")
+#     ret = [(config, idx[0]) for config, idx in zip(conditions, indices)
+#            if idx[-1]]
+#     return ret
+
+# def apply_boundary(stiff, loads, nodes, compiled_boundary, scale=1.0):
+#     for cond, idx in compiled_boundary:
+#         routine = __SBT_.get(cond[0], __SBT_["default"])
+#         if len(routine) == len(__SBT_["default"]):
+#             print(routine[0](cond[0]))
+#         else:
+#             if cond[1] == "fixed":
+#                 routine[1](stiff, loads, nodes, idx)
+#             elif cond[2] == "constant":
+#                 routine[2][0][cond[1]](stiff, loads, nodes, idx,
+#                                        scale * cond[4])
+#             elif cond[2] == "lambda":
+#                 routine[2][1][cond[1]](stiff, loads, nodes,
+#                                        idx, lambda x, y: scale * cond[4](x, y))
+#             else:
+#                 print(routine[0])
+# if cond[0] == "point":
+#     if cond[1] == "fixed":
+#         just_fixed_point(stiff, loads, nodes, idx)
+#     elif cond[2] == "constant":
+#         __SAPC_[cond[1]](stiff, loads, nodes, idx, scale * cond[4])
+#     elif cond[2] == "lambda":
+#         __SAPL_[cond[1]](stiff, loads, nodes,
+#                          idx, lambda x, y: scale * cond[4](x, y))
+#     else:
+#         print("Wrong boundary configs. Apply Point Config Failed.")
+# elif cond[0] == "segment":
+#     if cond[1] == "fixed":
+#         just_fixed_segment(stiff, loads, nodes, idx)
+#     elif cond[2] == "constant":
+#         __SASC_[cond[1]](stiff, loads, nodes, idx, scale * cond[4])
+#     elif cond[2] == "lambda":
+#         __SASL_[cond[1]](stiff, loads, nodes,
+#                          idx, lambda x, y: scale * cond[4](x, y))
+#     else:
+#         print("Wrong boundary configs. Apply Segment Config Failed.")
+# else:
+#     print(f"Wrong boundary configs. No such entry named {cond[0]}")
+#     print("Apply Failed.")
