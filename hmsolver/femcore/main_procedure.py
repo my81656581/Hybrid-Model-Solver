@@ -14,8 +14,6 @@ from hmsolver.femcore.stiffness import mapping_element_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1
 from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix_with_weight
 from hmsolver.femcore.pd_stiffness import deal_bond_stretch
-from hmsolver.femcore.treat_boundary import complie_boundary
-from hmsolver.femcore.treat_boundary import apply_boundary
 from hmsolver.femcore.postprocessing import get_absolute_displace
 from hmsolver.femcore.postprocessing import get_strain_field
 from hmsolver.femcore.postprocessing import get_stress_field
@@ -26,12 +24,15 @@ from hmsolver.femcore.postprocessing import get_deform_mesh
 from hmsolver.femcore.postprocessing import generate_tecplot_config
 from hmsolver.femcore.postprocessing import export_tecplot_data
 
-__all__ = []
+__all__ = [
+    'accumulate_stiffness_matrix', 'assemble_load_vector',
+    'solve_linear_system', 'elasticity', 'morphing_phase', 'morphing_setup',
+    'morphing'
+]
 
 MAX_DISTORTION_ENERGY = 5.5e7
 TOTAL_PHASES = 1
 MAX_ITER = 100
-EXAMPLE_NAME = "example-05"
 
 
 def accumulate_stiffness_matrix(*stiff_mats):
@@ -63,8 +64,7 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     as0 = pickle.load(open(f'ESM-{n_elements}-elements.bin', "rb"))
     a0 = mapping_element_stiffness_matrix(p, t, basis, as0)
     b = assemble_load_vector(n_nodes)
-    compiled_boundary = complie_boundary(p, bconds)
-    apply_boundary(a0, b, p, compiled_boundary, boundary_scale)
+    bconds.complie(p).apply(a0, b, p, boundary_scale)
     u = solve_linear_system(a0, b)
     return u
 
@@ -73,7 +73,7 @@ def morphing_phase(phase_id: int,
                    runtime_id: int,
                    mesh2D,
                    material2D,
-                   bconds,
+                   compiled_bonds,
                    basis,
                    boundary_scale=1.0,
                    s_crit=1.1,
@@ -115,8 +115,7 @@ def morphing_phase(phase_id: int,
         t0 = time.time()
         a = accumulate_stiffness_matrix(a0, apd)
         b = assemble_load_vector(n_nodes)
-        compiled_boundary = complie_boundary(p, bconds)
-        apply_boundary(a, b, p, compiled_boundary, boundary_scale)
+        compiled_bonds.apply(a, b, p, boundary_scale)
         u = solve_linear_system(a, b)
         broken_endpoint, cnt = deal_bond_stretch(p, t, related,
                                                  weight_function_handle,
@@ -175,11 +174,12 @@ def morphing(mesh2D,
         flag, runtime_id = True, 1
         while flag:
             flag = False
+            cbonds = bconds.compile(mesh2D.nodes)
             u, all_broken_endpoint = morphing_phase(phase,
                                                     runtime_id,
                                                     mesh2D,
                                                     material2D,
-                                                    bconds,
+                                                    cbonds,
                                                     basis,
                                                     boundary_scale,
                                                     s_crit=s_crit,
