@@ -1,6 +1,9 @@
 from collections import namedtuple
 
-__all__ = ['BasisInfo', 'get_localnodes_by_id', 'get_zonetype_by_id']
+__all__ = [
+    'BasisInfo', 'get_localnodes_by_id', 'get_zonetype_by_id',
+    'is_suitable_for_mesh'
+]
 
 BasisInfo = namedtuple('BasisInfo', ['id', 'localnodes', 'zonetype'])
 
@@ -18,3 +21,7 @@ def get_localnodes_by_id(e_basistype: int) -> int:
 
 def get_zonetype_by_id(e_basistype: int) -> str:
     return __BASIS_MAP_[e_basistype].zonetype
+
+
+def is_suitable_for_mesh(element_typeid: int, mesh_typeid: int) -> bool:
+    return (element_typeid % 100) == (mesh_typeid % 100)
