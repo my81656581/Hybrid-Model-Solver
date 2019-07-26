@@ -14,6 +14,10 @@ from hmsolver.femcore.stiffness import mapping_element_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1
 from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix_with_weight
 from hmsolver.femcore.pd_stiffness import deal_bond_stretch
+
+from hmsolver.femcore.treat_boundary import CompiledBoundaryConds2d
+from hmsolver.femcore.treat_boundary import BoundaryConds2d
+
 from hmsolver.femcore.postprocessing import get_absolute_displace
 from hmsolver.femcore.postprocessing import get_strain_field
 from hmsolver.femcore.postprocessing import get_stress_field
@@ -51,12 +55,7 @@ def solve_linear_system(a, b):
 def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     n_nodes, n_elements = mesh2D.n_nodes, mesh2D.n_elements
     p, t = mesh2D.nodes, mesh2D.elements
-    print(f"n_nodes= {n_nodes}, n_elements= {n_elements}")
-    print(f"len(p)= {len(p)}, len(t)= {len(t)}")
-    lame_mu = material2D.lame_mu
-    lame_lambda = material2D.lame_lambda
     constitutive = material2D.constitutive
-    print(f"lame parameters: lambda={lame_lambda:.4e}, mu={lame_mu:.4e}")
     jacobis = preprocessing_all_jacobi(p, t, basis)
     # just cache for test
     ks0 = generate_stiffness_matrix_k0(p, t, constitutive, basis, jacobis)
@@ -64,7 +63,10 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     as0 = pickle.load(open(f'ESM-{n_elements}-elements.bin', "rb"))
     a0 = mapping_element_stiffness_matrix(p, t, basis, as0)
     b = assemble_load_vector(n_nodes)
-    bconds.complie(p).apply(a0, b, p, boundary_scale)
+    if isinstance(bconds, BoundaryConds2d):
+        bconds.compile(p).apply(a0, b, p, boundary_scale)
+    elif isinstance(bconds, CompiledBoundaryConds2d):
+        bconds.apply(a0, b, p, boundary_scale)
     u = solve_linear_system(a0, b)
     return u
 
