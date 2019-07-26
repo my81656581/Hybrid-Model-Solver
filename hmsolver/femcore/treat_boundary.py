@@ -12,7 +12,7 @@ __all__ = [
     'just_set_segment_uy', 'just_set_segment_ux_uy',
     'just_set_segment_ux_by_lambda', 'just_set_segment_uy_by_lambda',
     'just_set_segment_ux_uy_by_lambda', 'Boundary_Func', 'Boundary_Cond',
-    'boundary_cond2d', 'Compiled_Boundary_Conds2d', 'Boundary_Conds2d'
+    'boundary_cond2d', 'CompiledBoundaryConds2d', 'BoundaryConds2d'
 ]
 
 EPS = geometry.EPS
@@ -194,7 +194,7 @@ __SASL_ = {
     "set_ux_uy": just_set_segment_ux_uy_by_lambda
 }  # __SWITCH_APPLY_SEGMENT_LAMBDA_
 
-__SBT_ = {
+SBT = {
     "default": [
         lambda s:
         f"Apply Failed. \nWrong boundary configs. No such entry named {s}"
@@ -203,7 +203,7 @@ __SBT_ = {
         "Wrong boundary configs. Apply Point Config Failed.", just_fixed_point,
         [__SAPC_, __SAPL_]
     ],
-    "segemt": [
+    "segment": [
         "Wrong boundary configs. Apply Segment Config Failed.",
         just_fixed_segment, [__SASC_, __SASL_]
     ]
@@ -218,31 +218,31 @@ def boundary_cond2d(boundary_type, criteria, app_type, method, value):
     return Boundary_Cond(boundary_type, criteria, app)
 
 
-class Compiled_Boundary_Conds2d(list):
+class CompiledBoundaryConds2d(list):
     def __init__(self, *cbconds):
         list.__init__([])
         self.extend(cbconds)
 
     def apply(self, stiff, loads, nodes, scale=1.0):
         for cond, idx in self:
-            routine = __SBT_.get(cond[0], __SBT_["default"])
-            if len(routine) == len(__SBT_["default"]):
-                print(routine[0](cond[0]))
+            routine = SBT.get(cond.type, SBT["default"])
+            if len(routine) == len(SBT["default"]):
+                print(routine[0](cond.type))
             else:
-                if cond[1] == "fixed":
+                if cond.app.type == "fixed":
                     routine[1](stiff, loads, nodes, idx)
-                elif cond[2] == "constant":
-                    routine[2][0][cond[1]](stiff, loads, nodes, idx,
-                                           scale * cond[4])
-                elif cond[2] == "lambda":
-                    routine[2][1][cond[1]](
+                elif cond.app.method == "constant":
+                    routine[2][0][cond.app.type](stiff, loads, nodes, idx,
+                                                 scale * cond.app.value)
+                elif cond.app.method == "lambda":
+                    routine[2][1][cond.app.type](
                         stiff, loads, nodes,
-                        idx, lambda x, y: scale * cond[4](x, y))
+                        idx, lambda x, y: scale * cond.app.value(x, y))
                 else:
                     print(routine[0])
 
 
-class Boundary_Conds2d(list):
+class BoundaryConds2d(list):
     def __init__(self, *bconds):
         list.__init__([])
         self.extend(bconds)
@@ -263,7 +263,7 @@ class Boundary_Conds2d(list):
                 print("Compile Failed.")
         ret = [(config, idx[0]) for config, idx in zip(self, indices)
                if idx[-1]]
-        return Compiled_Boundary_Conds2d(ret)
+        return CompiledBoundaryConds2d(*ret)
 
     def manually_verify(self):
         self.__ready_ = True
@@ -297,7 +297,7 @@ class Boundary_Conds2d(list):
 #         else:
 #             if cond[1] == "fixed":
 #                 routine[1](stiff, loads, nodes, idx)
-#             elif cond[2] == "constant":
+#             elif cond.app.method == "constant":
 #                 routine[2][0][cond[1]](stiff, loads, nodes, idx,
 #                                        scale * cond[4])
 #             elif cond[2] == "lambda":
