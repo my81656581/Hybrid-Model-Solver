@@ -4,6 +4,7 @@ from scipy.spatial.distance import pdist, squareform
 # from typing import Callable, List, Tuple
 
 from hmsolver.basis.basisinfo import get_localnodes_by_id
+from hmsolver.basis.basisinfo import get_zonetype_by_id
 
 __all__ = ['Mesh2d']
 
@@ -25,6 +26,7 @@ class Mesh2d(object):
         self.__n_elements_ = n_elements
         self.__e_basistype_ = e_basistype
         self.__n_localnodes_ = get_localnodes_by_id(e_basistype)
+        self.__e_zonetype_ = get_zonetype_by_id(e_basistype)
         self.__nodes_ = np.zeros(shape=(n_nodes, 2))
         self.__adjoint_ = [[] for _ in range(n_nodes)]
         self.__x_, self.__y_ = [self.__nodes_[:, _] for _ in range(2)]
@@ -75,6 +77,10 @@ class Mesh2d(object):
     @property
     def e_basistype(self):
         return self.__e_basistype_
+
+    @property
+    def e_zonetype(self):
+        return self.__e_zonetype_
 
     @property
     def x(self):
