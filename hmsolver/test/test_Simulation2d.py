@@ -15,6 +15,8 @@ from hmsolver.material.pd_material2d import PdMaterial2d
 
 from hmsolver.basis.quad4 import Quad4Node
 
+from hmsolver.femcore.preprocessing import read_mesh
+
 if __name__ == '__main__':
     input_file = 'data_2601_2500.msh'
     example_name = 'example-05'
@@ -87,4 +89,4 @@ if __name__ == '__main__':
     print('\n' * 3)
     a.apply_basis(Quad4Node())
     a.check_engine()
-    u = a.u_solution()
+    a.export_to_tecplot("elasticity", *a.provied_solutions)
