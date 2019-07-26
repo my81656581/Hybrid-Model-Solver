@@ -69,8 +69,8 @@ class Simulation2d(Problem2d):
         print("OK." if self.ready() else "Failed.")
         print("*" * 32)
         if self.ready():
-            self.__u_, self.__eps_, self.__sigma_ = None, None, None
-            self.__u_abs_, self.__w_dis_ = None, None
+            self._u_, self._eps_, self._sigma_ = None, None, None
+            self._u_abs_, self._w_dis_ = None, None
 
     @property
     def app_name(self):
@@ -116,51 +116,51 @@ class Simulation2d(Problem2d):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
             return None
-        if self.__u_ is None:
-            self.__u_ = main_procedure.elasticity(self.mesh, self.material,
-                                                  self.boundary_conds,
-                                                  self.basis)
-        return self.__u_
+        if self._u_ is None:
+            self._u_ = main_procedure.elasticity(self.mesh, self.material,
+                                                 self.boundary_conds,
+                                                 self.basis)
+        return self._u_
 
     @property
     def u_abs(self):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
             return None
-        if self.__u_abs_ is None:
-            self.__u_abs_ = postprocessing.get_absolute_displace(self.u)
-        return self.__u_abs_
+        if self._u_abs_ is None:
+            self._u_abs_ = postprocessing.get_absolute_displace(self.u)
+        return self._u_abs_
 
     @property
     def epsilon(self):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
             return None
-        if self.__eps_ is None:
-            self.__eps_ = postprocessing.get_strain_field(
+        if self._eps_ is None:
+            self._eps_ = postprocessing.get_strain_field(
                 self.mesh.nodes, self.mesh.elements, self.basis, self.u)
-        return self.__eps_
+        return self._eps_
 
     @property
     def sigma(self):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
             return None
-        if self.__sigma_ is None:
-            self.__sigma_ = postprocessing.get_stress_field(
+        if self._sigma_ is None:
+            self._sigma_ = postprocessing.get_stress_field(
                 self.material.constitutive, self.epsilon)
-        return self.__sigma_
+        return self._sigma_
 
     @property
     def w_dis(self):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
             return None
-        if self.__w_dis_ is None:
-            self.__w_dis_ = postprocessing.get_distortion_energy(
+        if self._w_dis_ is None:
+            self._w_dis_ = postprocessing.get_distortion_energy(
                 self.material.youngs_modulus, self.material.poissons_ratio,
                 self.sigma)
-        return self.__w_dis_
+        return self._w_dis_
 
     def export_to_tecplot(self, export_filename, *orders):
         cfg = postprocessing.generate_tecplot_config(self.mesh.n_nodes,
@@ -191,3 +191,14 @@ class PdSimulation2d(Simulation2d, PdProblem2d):
     def _check_material(self):
         self._state_[1] = self.material.is_pdready()
         return self._state_[1]
+
+    @property
+    def u(self):
+        if not self.ready():
+            print("Engine is NOT ready. Pls check engine first.")
+            return None
+        if self._u_ is None:
+            self._u_ = main_procedure.peridynamic(self.mesh, self.material,
+                                                  self.boundary_conds,
+                                                  self.basis)
+        return self._u_

@@ -12,6 +12,7 @@ from hmsolver.femcore.stiffness import preprocessing_all_jacobi
 from hmsolver.femcore.stiffness import generate_stiffness_matrix_k0
 from hmsolver.femcore.stiffness import mapping_element_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1
+from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix_with_weight
 from hmsolver.femcore.pd_stiffness import deal_bond_stretch
 
@@ -71,11 +72,28 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     return u
 
 
+def peridynamic(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
+    n_nodes, n_elements = mesh2D.n_nodes, mesh2D.n_elements
+    p, t, related = mesh2D.nodes, mesh2D.elements, mesh2D.bonds
+    # just cache for test
+    k0 = assemble_stiffness_matrix(p, t, related, material2D.generate_coef(),
+                                   basis)
+    pickle.dump(k0, open(f"PDSM-{n_elements}-elements.bin", "wb"))
+    a0 = pickle.load(open(f'PDSM-{n_elements}-elements.bin', "rb"))
+    b = assemble_load_vector(n_nodes)
+    if isinstance(bconds, BoundaryConds2d):
+        bconds.compile(p).apply(a0, b, p, boundary_scale)
+    elif isinstance(bconds, CompiledBoundaryConds2d):
+        bconds.apply(a0, b, p, boundary_scale)
+    u = solve_linear_system(a0, b)
+    return u
+
+
 def morphing_phase(phase_id: int,
                    runtime_id: int,
                    mesh2D,
                    material2D,
-                   compiled_bonds,
+                   compiled_bconds,
                    basis,
                    boundary_scale=1.0,
                    s_crit=1.1,
@@ -117,7 +135,7 @@ def morphing_phase(phase_id: int,
         t0 = time.time()
         a = accumulate_stiffness_matrix(a0, apd)
         b = assemble_load_vector(n_nodes)
-        compiled_bonds.apply(a, b, p, boundary_scale)
+        compiled_bconds.apply(a, b, p, boundary_scale)
         u = solve_linear_system(a, b)
         broken_endpoint, cnt = deal_bond_stretch(p, t, related,
                                                  weight_function_handle,

@@ -25,6 +25,7 @@ class Problem2d(object):
             if not flag:
                 print(f"{s1} instance type ERROR.")
                 print(f"SHOULD BE {s2} object/subclass object.")
+        self.__type_check_result_ = all(flags)
         return all(flags)
 
     @property
