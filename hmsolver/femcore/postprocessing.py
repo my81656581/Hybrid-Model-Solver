@@ -100,14 +100,14 @@ def maximum_distortion_energy_criterion(distortion_energy, w_max):
 def generate_tecplot_config(n_nodes: int,
                             n_elements: int,
                             n_localnodes: int = 4,
-                            e_type: str = "FEQUADRILATERAL"):
+                            e_zonetype: str = "FEQUADRILATERAL"):
     return {
         "title": "Solution",
         "variables": "X, Y, U_x, U_y",
         "n_nodes": n_nodes,
         "n_elements": n_elements,
         "n_localnodes": n_localnodes,
-        "e_type": e_type
+        "e_zonetype": e_zonetype
     }
 
 
@@ -120,15 +120,11 @@ def export_tecplot_data(export: str, config: Dict, nodes, elements,
     with open(export, 'w') as fout:
         print(f"TITLE= {config['title']}", file=fout)
         print(f"VARIABLES= {config['variables']}", file=fout)
-        print(
-            f"ZONE N= {config['n_nodes']}, E= {config['n_elements']}, DATAPACKING=POINT, ZONETYPE={config['e_type']}",
-            file=fout)
+        print(f"ZONE N= {config['n_nodes']}, ", end="", file=fout)
+        print(f"E= {config['n_elements']}, ", end="", file=fout)
+        print(f"DATAPACKING=POINT, ZONETYPE={config['e_zonetype']}", file=fout)
         for i in range(config["n_nodes"]):
-            print(f"{nodes[i][0]:6f}",
-                  f"{nodes[i][1]:6f}",
-                  end='',
-                  sep='\t',
-                  file=fout)
+            print(f"{nodes[i][0]:6f}\t{nodes[i][1]:6f}", end='', file=fout)
             for sol in solutions:
                 for j in range(sol.shape[1]):
                     print('\t', sol[i][j], end='', sep='', file=fout)
