@@ -6,8 +6,17 @@ from hmsolver.basis.basisinfo import is_suitable_for_mesh
 from hmsolver.basis.infrastructures import IShapeable
 
 import hmsolver.femcore.main_procedure as main_procedure
+import hmsolver.femcore.postprocessing as postprocessing
 
 __all__ = ['Simulation2d', 'PdSimulation2d']
+
+HEADER = {
+    "displace_field": "Ux, Uy",
+    "absolute_displace": "Uabs",
+    "strain_field": "epsilon_x, epsilon_y, epsilon_xy",
+    "stress_field": "sigma_x, sigma_y, sigma_xy",
+    "distortion_energy": "w_distortion"
+}
 
 
 class Simulation2d(Problem2d):
@@ -16,6 +25,13 @@ class Simulation2d(Problem2d):
         self.__basis_ = None
         self._state_ = [False, False, False, False]
         self.__app_name_ = None
+        self.__provied_solutions_ = [
+            "displace_field",
+            "absolute_displace",
+            "strain_field",
+            "stress_field",
+            "distortion_energy",
+        ]
 
     def _check_mesh(self):
         self._state_[0] = self.mesh.is_ready()
@@ -52,10 +68,17 @@ class Simulation2d(Problem2d):
             print(f"{msg} is", " NOT" if not func() else "", " ready.", sep='')
         print("OK." if self.ready() else "Failed.")
         print("*" * 32)
+        if self.ready():
+            self.__u_, self.__eps_, self.__sigma_ = None, None, None
+            self.__u_abs_, self.__w_dis_ = None, None
 
     @property
     def app_name(self):
         return self.__app_name_
+
+    @property
+    def provied_solutions(self):
+        return self.__provied_solutions_
 
     @app_name.setter
     def app_name(self, name):
@@ -68,12 +91,96 @@ class Simulation2d(Problem2d):
     def ready(self) -> bool:
         return all(self._state_)
 
-    def u_solution(self):
+    @property
+    def displace_field(self):
+        return self.u
+
+    @property
+    def absolute_u(self):
+        return self.u_abs
+
+    @property
+    def strain_field(self):
+        return self.epsilon
+
+    @property
+    def stress_field(self):
+        return self.sigma
+
+    @property
+    def distortion_energy(self):
+        return self.w_dis
+
+    @property
+    def u(self):
         if not self.ready():
             print("Engine is NOT ready. Pls check engine first.")
-            return False, None
-        return True, main_procedure.elasticity(self.mesh, self.material,
-                                               self.boundary_conds, self.basis)
+            return None
+        if self.__u_ is None:
+            self.__u_ = main_procedure.elasticity(self.mesh, self.material,
+                                                  self.boundary_conds,
+                                                  self.basis)
+        return self.__u_
+
+    @property
+    def u_abs(self):
+        if not self.ready():
+            print("Engine is NOT ready. Pls check engine first.")
+            return None
+        if self.__u_abs_ is None:
+            self.__u_abs_ = postprocessing.get_absolute_displace(self.u)
+        return self.__u_abs_
+
+    @property
+    def epsilon(self):
+        if not self.ready():
+            print("Engine is NOT ready. Pls check engine first.")
+            return None
+        if self.__eps_ is None:
+            self.__eps_ = postprocessing.get_strain_field(
+                self.mesh.nodes, self.mesh.elements, self.basis, self.u)
+        return self.__eps_
+
+    @property
+    def sigma(self):
+        if not self.ready():
+            print("Engine is NOT ready. Pls check engine first.")
+            return None
+        if self.__sigma_ is None:
+            self.__sigma_ = postprocessing.get_stress_field(
+                self.material.constitutive, self.epsilon)
+        return self.__sigma_
+
+    @property
+    def w_dis(self):
+        if not self.ready():
+            print("Engine is NOT ready. Pls check engine first.")
+            return None
+        if self.__w_dis_ is None:
+            self.__w_dis_ = postprocessing.get_distortion_energy(
+                self.material.youngs_modulus, self.material.poissons_ratio,
+                self.sigma)
+        return self.__w_dis_
+
+    def export_to_tecplot(self, export_filename, *orders):
+        cfg = postprocessing.generate_tecplot_config(self.mesh.n_nodes,
+                                                     self.mesh.n_elements,
+                                                     self.mesh.n_localnodes,
+                                                     self.mesh.e_zonetype)
+        header = ["X, Y"]
+        header.extend([HEADER[_] for _ in orders])
+        cfg["variables"] = ", ".join(header)
+        __DATA_MAPPING_ = {
+            "displace_field": self.u,
+            "absolute_displace": self.u_abs,
+            "strain_field": self.epsilon,
+            "stress_field": self.sigma,
+            "distortion_energy": self.w_dis
+        }
+        data = [__DATA_MAPPING_[_] for _ in orders]
+        postprocessing.export_tecplot_data(
+            f"{self.app_name}-{export_filename}.dat", cfg, self.mesh.nodes,
+            self.mesh.elements, *data)
 
 
 class PdSimulation2d(Simulation2d, PdProblem2d):
