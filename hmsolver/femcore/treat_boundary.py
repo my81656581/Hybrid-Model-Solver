@@ -15,9 +15,7 @@ __all__ = [
     'boundary_cond2d', 'CompiledBoundaryConds2d', 'BoundaryConds2d'
 ]
 
-EPS = geometry.EPS
-SPACING = geometry.SPACING
-BIG = geometry.BIG
+EPS, BIG = geometry.EPS, geometry.BIG
 
 
 def __set_zero(stiff, load, target, val):

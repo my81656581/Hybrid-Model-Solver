@@ -2,8 +2,8 @@ import numpy as np
 
 from hmsolver.basis.quad4 import Quad4Node
 from hmsolver.material.material2d import Material2d
+from hmsolver.meshgrid.zone2d import Zone2d
 from hmsolver.meshgrid.prototype_pd_mesh2d import PrototypePdMesh2d
-from hmsolver.meshgrid.generate_mesh import build_mesh
 from hmsolver.femcore.pd_stiffness import estimate_stiffness_matrix
 
 __all__ = ['PdMaterial2d']
@@ -23,11 +23,9 @@ class PdMaterial2d(Material2d):
         assert scale > 0
         grids = 2 * scale + 1
         _l, _r, _d = 0, grids * self.grid_size, self.grid_size
-        nodes, elements = build_mesh((_l, _r, _d), (_l, _r, _d))
-        n_nodes, n_elements = len(nodes), len(elements)
-        self.__mesh_ = PrototypePdMesh2d(n_nodes, n_elements)
-        self.__mesh_.manually_construct(np.array(nodes), np.array(elements))
-        self.__mesh_.prototype_construct(self.horizon_radius)
+        self.__mesh_ = Zone2d(_l, _r, _l,
+                              _r).meshgrid_zone(PrototypePdMesh2d, _d)
+        self.__mesh_.peridynamic_construct(self.horizon_radius)
 
     def generate_coef(self):
         c0, c1, c2 = self.coefficients

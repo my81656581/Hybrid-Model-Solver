@@ -11,7 +11,7 @@ class PrototypePdMesh2d(Mesh2d):
         super().__init__(n_nodes, n_elements, e_basistype)
         self._pdready_ = False
 
-    def prototype_construct(self, horizon_radius: float) -> None:
+    def peridynamic_construct(self, horizon_radius: float) -> None:
         self.__startup(horizon_radius)
         self._build_dist()
         self.__build_bonds()

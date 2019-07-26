@@ -1,6 +1,7 @@
+import numpy as np
 from typing import List, Tuple
 
-__all__ = ['read_mesh', 'convert_gmsh_into_msh']
+__all__ = ['read_mesh', 'read_mesh_to_MeshObject', 'convert_gmsh_into_msh']
 
 
 def read_mesh(mesh_data_file: str) -> Tuple[int, int, List, List]:
@@ -14,6 +15,13 @@ def read_mesh(mesh_data_file: str) -> Tuple[int, int, List, List]:
         for _ in range(n_elements):
             elements.append(list(map(int, fin.readline().split())))
     return n_nodes, n_elements, nodes, elements
+
+
+def read_mesh_to_MeshObject(mesh_data_file: str, mesh_type):
+    n_nodes, n_elements, nodes, elements = read_mesh(mesh_data_file)
+    mesh = mesh_type(n_nodes, n_elements)
+    mesh.manually_construct(np.array(nodes), np.array(elements))
+    return mesh
 
 
 def convert_gmsh_into_msh(gmsh_data_file: str, export_file: str):
