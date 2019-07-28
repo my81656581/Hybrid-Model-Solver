@@ -12,5 +12,5 @@ def is_zero(x):
 
 
 def xmult(A, O, C):
-    # (O - A) x (O - C)
+    # (O -> A) x (O -> C)
     return (A[0] - O[0]) * (C[1] - O[1]) - (C[0] - O[0]) * (A[1] - O[1])
