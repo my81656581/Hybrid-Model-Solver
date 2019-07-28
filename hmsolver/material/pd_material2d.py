@@ -14,9 +14,13 @@ class PdMaterial2d(Material2d):
         super().__init__(E, v)
         self.__coefficients_ = coefficients
         self.__pdready_ = False
+        self.__stretch_crit_ = None
 
     def is_pdready(self):
         return self.__pdready_
+
+    def can_break(self):
+        return not (self.stretch_crit is None)
 
     def __init_std_meshgrid(self):
         scale = self.horizon_radius // self.grid_size
@@ -82,6 +86,14 @@ class PdMaterial2d(Material2d):
     @property
     def inst_len(self):
         return self.__inst_len_
+
+    @property
+    def stretch_crit(self):
+        return self.__stretch_crit_
+
+    @stretch_crit.setter
+    def stretch_crit(self, s_crit=1.1):
+        self.__stretch_crit_ = s_crit
 
 
 # if __name__ == "__main__":
