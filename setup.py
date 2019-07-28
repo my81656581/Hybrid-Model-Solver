@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='hmsolver',
-      version='0.2a',
+      version='0.2.1.a90727',
       description='Hybrid Model Solver',
       url='https://github.com/polossk/Hybrid-Model-Solver',
       author='Shangkun Shen(polossk)',
