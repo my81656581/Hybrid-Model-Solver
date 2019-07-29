@@ -39,22 +39,15 @@ if __name__ == '__main__':
                                   zone_xmid - geometry.SPACING, zone_yr)
     boundary_3 = segment_criteria(zone_xmid + geometry.SPACING, zone_yr,
                                   zone_xr, zone_yr)
-    # boundary_4 = segment_criteria(zone_xl, zone_yr, zone_xr, zone_yr)
-
     _bc_ = boundary_cond2d  # abbreviate the word for type & read
     boundarys = BoundaryConds2d(
         _bc_("point", boundary_0, "fixed", None, None),
         _bc_("segment", boundary_1, "set_uy", "constant", 0),
         _bc_("segment", boundary_2, "set_ux", "constant", -stretch),
-        _bc_("segment", boundary_3, "set_ux", "constant", +stretch),
-        # _bc_("segment", boundary_2, "set_ux",
-        #  "lambda", lambda x, y: slope * x - 0.5 * stretch),
-        # _bc_("segment", boundary_3, "set_ux",
-        #  "lambda", lambda x, y: slope * x + 1.5 * stretch),
-        # _bc_("segment", boundary_4, "set_uy", "constant", tension),
-    )
+        _bc_("segment", boundary_3, "set_ux", "constant", +stretch))
     del _bc_  # delete the abbreviation
     boundarys.manually_verify()
+
     a = CrackSimulation2d(mesh2d, material2d, boundarys)
     a.app_name = "plate"
     a.material.setIsotropic(horizon_radius, grid_size, inst_len)

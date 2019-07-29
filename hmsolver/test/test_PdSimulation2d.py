@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     material2d = PdMaterial2d(3e11, 1.0 / 3)
 
-    stretch, tension = 0.04, 0.02
+    stretch = 0.04
     slope = stretch / (zone_xl - zone_xr) / 2
     boundary_0 = point_criteria(zone_xmid, zone_yl)
     boundary_1 = segment_criteria(zone_xl, zone_yl, zone_xr, zone_yl)
@@ -39,20 +39,13 @@ if __name__ == '__main__':
                                   zone_xmid - geometry.SPACING, zone_yr)
     boundary_3 = segment_criteria(zone_xmid + geometry.SPACING, zone_yr,
                                   zone_xr, zone_yr)
-    # boundary_4 = segment_criteria(zone_xl, zone_yr, zone_xr, zone_yr)
 
     _bc_ = boundary_cond2d  # abbreviate the word for type & read
     boundarys = BoundaryConds2d(
         _bc_("point", boundary_0, "fixed", None, None),
         _bc_("segment", boundary_1, "set_uy", "constant", 0),
         _bc_("segment", boundary_2, "set_ux", "constant", -stretch),
-        _bc_("segment", boundary_3, "set_ux", "constant", +stretch),
-        # _bc_("segment", boundary_2, "set_ux",
-        #  "lambda", lambda x, y: slope * x - 0.5 * stretch),
-        # _bc_("segment", boundary_3, "set_ux",
-        #  "lambda", lambda x, y: slope * x + 1.5 * stretch),
-        # _bc_("segment", boundary_4, "set_uy", "constant", tension),
-    )
+        _bc_("segment", boundary_3, "set_ux", "constant", +stretch))
     del _bc_  # delete the abbreviation
     boundarys.manually_verify()
     a = PdSimulation2d(mesh2d, material2d, boundarys)
