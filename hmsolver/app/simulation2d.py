@@ -10,7 +10,7 @@ from hmsolver.app.failureprone import ProneRing2d
 import hmsolver.femcore.main_procedure as main_procedure
 import hmsolver.femcore.postprocessing as postprocessing
 
-__all__ = ['Simulation2d', 'PdSimulation2d']
+__all__ = ['Simulation2d', 'PdSimulation2d', 'CrackSimulation2d']
 
 HEADER = {
     "displace_field": "Ux, Uy",
