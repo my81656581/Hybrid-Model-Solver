@@ -5,8 +5,8 @@ import numpy as np
 # import sys
 # sys.path.append('./../../')
 
-from hmsolver.material.material2d import Material2d
-from hmsolver.material.pd_material2d import PdMaterial2d
+from hmsolver.material import Material2d
+from hmsolver.material import PdMaterial2d
 
 
 class TestPdMaterial2d(unittest.TestCase):
