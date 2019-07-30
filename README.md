@@ -1,9 +1,9 @@
 # Hybrid-Model-Solver
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Version](https://img.shields.io/badge/pre--release-0.2.2.a90730-brightgreen.svg)
-[![PyPI](https://img.shield.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Version](https://img.shields.io/badge/pre--release-0.3.0.a90730-brightgreen.svg)
+[![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
 
@@ -12,8 +12,8 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 ## How to Use
 
 * use PyPI to install/keep updated, type `pip install hmsolver` or `pip install hmsolver==<VERSION>` for specific version of it
-* check [`example`](example) folder first to know how to use this tool
-* I have provided a short version of manual in Chinese, go and check [this](Chinese-Handbook) First
+* check [`example`](https://github.com/polossk/Hybrid-Model-Solver/tree/master/example) folder first to know how to use this tool
+* I have provided a short version of manual in Chinese, go and check [this](https://github.com/polossk/Hybrid-Model-Solver/tree/master/Chinese-Handbook) First
 
 ## Copyright
 Use this code whatever you want, under the circumstances of acknowleged the
