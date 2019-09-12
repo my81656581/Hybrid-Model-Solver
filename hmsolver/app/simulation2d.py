@@ -133,7 +133,7 @@ class Simulation2d(Problem2d):
     def u_abs(self):
         if not self._selfcheck():
             return None
-        if self._u_abs_ is None:
+        if self._u_abs_ is None or self._u_.shape[0] != self._u_abs_.shape[0]:
             self._u_abs_ = postprocessing.get_absolute_displace(self.u)
         return self._u_abs_
 
@@ -141,7 +141,7 @@ class Simulation2d(Problem2d):
     def epsilon(self):
         if not self._selfcheck():
             return None
-        if self._eps_ is None:
+        if self._eps_ is None or self._u_.shape[0] != self._eps_.shape[0]:
             self._eps_ = postprocessing.get_strain_field(
                 self.mesh.nodes, self.mesh.elements, self.basis, self.u)
         return self._eps_
@@ -150,7 +150,7 @@ class Simulation2d(Problem2d):
     def sigma(self):
         if not self._selfcheck():
             return None
-        if self._sigma_ is None:
+        if self._sigma_ is None or self._u_.shape[0] != self._sigma_.shape[0]:
             self._sigma_ = postprocessing.get_stress_field(
                 self.material.constitutive, self.epsilon)
         return self._sigma_
@@ -159,7 +159,7 @@ class Simulation2d(Problem2d):
     def w_dis(self):
         if not self._selfcheck():
             return None
-        if self._w_dis_ is None:
+        if self._w_dis_ is None or self._u_.shape[0] != self._w_dis_.shape[0]:
             self._w_dis_ = postprocessing.get_distortion_energy(
                 self.material.youngs_modulus, self.material.poissons_ratio,
                 self.sigma)

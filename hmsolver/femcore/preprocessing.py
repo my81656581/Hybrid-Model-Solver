@@ -47,8 +47,26 @@ def convert_gmsh_into_msh(gmsh_data_file: str, export_file: str):
                 continue
             elements.append([_ - 1 for _ in hoge[-4:]])
         n_elements = len(elements)
+    visit = [False for i in range(n_nodes)]
+    for element in elements:
+        for node in element:
+            visit[node] = True
+    nodes_without_toolmen, toolmen = [], []
+    for node, flag, idx in zip(nodes, visit, range(n_nodes)):
+        if flag:
+            nodes_without_toolmen.append(node)
+        else:
+            toolmen.append(idx)
+    toolmen = sorted(toolmen, reverse=True)
+    for i in range(len(elements)):
+        for j in range(len(element)):
+            current = elements[i][j]
+            for toolman in toolmen:
+                current -= 1 if current > toolman else 0
+            elements[i][j] = current
+    n_nodes = len(nodes_without_toolmen)
     with open(export_file, 'w') as fout:
-        for _ in (nodes, elements):
+        for _ in (nodes_without_toolmen, elements):
             print(len(_), file=fout)
             [print("\t".join(map(str, __)), file=fout) for __ in _]
     return n_nodes, n_elements

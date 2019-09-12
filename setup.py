@@ -4,7 +4,7 @@ with open("README.md", 'r', encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(name='hmsolver',
-      version='0.3.0.a90730',
+      version='0.3.1.a90912',
       description='Hybrid Model Solver',
       long_description=long_description,
       long_description_content_type="text/markdown",

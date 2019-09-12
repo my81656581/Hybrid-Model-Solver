@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.3.0.a90730-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.3.1.a90912-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -15,7 +15,19 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 * check [`example`](https://github.com/polossk/Hybrid-Model-Solver/tree/master/example) folder first to know how to use this tool
 * I have provided a short version of manual in Chinese, go and check [this](https://github.com/polossk/Hybrid-Model-Solver/tree/master/Chinese-Handbook) First
 
+
+## Update Log(Most Recent)
+
+![Version](https://img.shields.io/badge/pre--release-0.3.1.a90912-brightgreen.svg)
+
+* **BUG**: *Fixed*. It will no longer use the node which not belong to any element when use function hmsolver.femcore.preprocessing.convert_gmsh_into_msh.
+* **BUG**: *Fixed*. It will rerun the solution while the new one comes.
+* **DEV**: *Maybe impove in future*. It's now using numpy.linalg.pinv to solve linear system, by avoiding the singular matrix problem.
+
+[(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
+
 ## Copyright
+
 Use this code whatever you want, under the circumstances of acknowleged the
 mit license this page below. Star this repository if you like, and it will
 be very generous of you!
@@ -26,9 +38,8 @@ be very generous of you!
 * Azdoud, Y., Han, F., & Lubineau, G. (2013). A Morphing framework to couple non-local and local anisotropic continua. *International Journal of Solids and Structures*, 50(9), 1332-1341. doi [10.1016/j.ijsolstr.2013.01.016](https://doi.org/10.1016/j.ijsolstr.2013.01.016)
 * Lubineau, G., Azdoud, Y., Han, F., Rey, C., & Askari, A. (2012). A morphing strategy to couple non-local to local continuum mechanics. *Journal of The Mechanics and Physics of Solids*, 60(6), 1088-1102. doi [10.1016/j.jmps.2012.02.009](https://doi.org/10.1016/j.jmps.2012.02.009)
 
-
-
 ## License
+
 The MIT License (MIT)
 
 Copyright (c) 2019 Shangkun Shen

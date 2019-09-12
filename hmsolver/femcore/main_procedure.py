@@ -48,7 +48,8 @@ def assemble_load_vector(n_nodes):
 
 
 def solve_linear_system(a, b):
-    u = np.reshape(np.linalg.solve(a, b), (2, -1)).T
+    u = np.reshape(np.linalg.pinv(a) @ b, (2, -1)).T
+    # u = np.reshape(np.linalg.solve(a, b), (2, -1)).T
     return u
 
 
@@ -63,10 +64,12 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     as0 = pickle.load(open(f'ESM-{n_elements}-elements.bin', "rb"))
     a0 = mapping_element_stiffness_matrix(p, t, basis, as0)
     b = assemble_load_vector(n_nodes)
+    pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-before.bin", "wb"))
     if isinstance(bconds, BoundaryConds2d):
         bconds.compile(p).apply(a0, b, p, boundary_scale)
     elif isinstance(bconds, CompiledBoundaryConds2d):
         bconds.apply(a0, b, p, boundary_scale)
+    pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-final.bin", "wb"))
     u = solve_linear_system(a0, b)
     return u
 

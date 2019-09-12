@@ -2,7 +2,7 @@
 
 
 from . import failureprone
-from failureprone import *
+from .failureprone import *
 from . import problem2d
 from .problem2d import *
 from . import simulation2d

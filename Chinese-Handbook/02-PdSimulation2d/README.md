@@ -97,7 +97,7 @@ mesh2d = zone.meshgrid_zone(HybridMesh2d, grid_size)
 ```python
 from hmsolver.material.pd_material2d import PdMaterial2d
 
-material2d = Material2d(3e11, 1.0 / 3)
+material2d = PdMaterial2d(3e11, 1.0 / 3)
 ```
 
 最后来处理我们的边界条件，边界条件涉及到的信息有类型，所施加的边界，和所施加的值。每一个独立的边界条件用 `Boundary_Cond` 类型封装，而每一个问题所对应的边界条件集合用 `BoundaryConds2d` 类型封装。由于 `BoundaryConds2d` 继承于 python 的列表类（list），所以更加方便我们添加边界条件。对于这个问题，他总共用到了 4 条边界条件，我们逐一声明，并且最后调用方法 `manually_verify()` 对边界条件进行人工确认。
