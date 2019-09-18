@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.3.1.a90912-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.0a0-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -15,14 +15,16 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 * check [`example`](https://github.com/polossk/Hybrid-Model-Solver/tree/master/example) folder first to know how to use this tool
 * I have provided a short version of manual in Chinese, go and check [this](https://github.com/polossk/Hybrid-Model-Solver/tree/master/Chinese-Handbook) First
 
-
 ## Update Log(Most Recent)
 
-![Version](https://img.shields.io/badge/pre--release-0.3.1.a90912-brightgreen.svg)
-
-* **BUG**: *Fixed*. It will no longer use the node which not belong to any element when use function hmsolver.femcore.preprocessing.convert_gmsh_into_msh.
-* **BUG**: *Fixed*. It will rerun the solution while the new one comes.
-* **DEV**: *Maybe impove in future*. It's now using numpy.linalg.pinv to solve linear system, by avoiding the singular matrix problem.
+![Version](https://img.shields.io/badge/pre--release-0.4.0a0-brightgreen.svg)
+* It's a stable version and much faster than before, so upgrade into 0.4*
+* **DEV**: *Improvement*. It now obeys [PEP400](https://www.python.org/dev/peps/pep-0440/) for version identification and dependency specification.
+* **DEV**: *Improvement*. It's now using another way to apply the boundary condition.
+* **DEV**: *Improvement*. It will return Stiffness Matrix and Loads Vector in stand of unsafe reference manipulating.
+* **DEV**: *Improvement*. It will use `scipy.sparse` and `scipy.sparse.linalg` to assemble Stiffness Matrix. It's much faster, saving about 30% time cost.
+* **DEV**: *Improvement*. Because of the defination of bonds, it can just run half of bond stretch test. This trick saves about 40% time cost.
+* **DEV**: *Improvement*. Move the useless code to recycle bin folder.
 
 [(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
 

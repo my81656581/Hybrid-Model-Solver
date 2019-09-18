@@ -5,4 +5,4 @@ __credits__ = ['polossk']
 __maintainer__ = 'polossk'
 __email__ = 'poloshensk@gmail.com'
 __license__ = 'MIT License'
-__version__ = '0.3.1.a90912'
+__version__ = '0.4.0a0'
