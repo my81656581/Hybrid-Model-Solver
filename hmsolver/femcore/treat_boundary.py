@@ -27,8 +27,11 @@ def __set_zero(stiff, load, target, val):
 
 
 def __set_value(stiff, load, target, val):
-    stiff[target, target] *= BIG
-    load[target] = val * stiff[target, target]
+    # stiff[target, target] *= BIG
+    # load[target] = val * stiff[target, target]
+    stiff[target, :] = 0
+    stiff[target, target] = 1
+    load[target] = val
     return True
 
 
@@ -238,6 +241,7 @@ class CompiledBoundaryConds2d(list):
                         idx, lambda x, y: scale * cond.app.value(x, y))
                 else:
                     print(routine[0])
+        return stiff, loads
 
 
 class BoundaryConds2d(list):
