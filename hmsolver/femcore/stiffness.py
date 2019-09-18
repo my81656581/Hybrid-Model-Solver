@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sp
 import time
 
 import hmsolver.utils as utils
@@ -31,10 +32,6 @@ def local_basis(x_gauss, y_gauss, vertices, local_jacobi: np.ndarray, basis,
     elif dx == 1 and dy == 0:
         hoge = helper[:, 0, 0] * basis.shapes_dx[basis_idx](x_gauss, y_gauss).T
         piyo = helper[:, 1, 0] * basis.shapes_dy[basis_idx](x_gauss, y_gauss).T
-        # print(3, "fuga", fuga.shape, fuga)
-        # print(3, "hoge", hoge.shape, hoge)
-        # print(3, "piyo", piyo.shape, piyo)
-        # print(3, "helper[:, 0, 0]", helper[:, 0, 0].shape, helper[:, 0, 0])
         return (hoge + piyo)
     elif dx == 0 and dy == 1:
         hoge = helper[:, 0, 1] * basis.shapes_dx[basis_idx](x_gauss, y_gauss)
@@ -127,7 +124,6 @@ def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stiffsize,
 
 def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
                                  jacobis):
-    # print(6, nodes.shape, elements.shape)
     w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_stiffsize = len(elements), basis.length
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
@@ -168,7 +164,9 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
 
 def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
     n_nodes, n_elements, n_stiffsize = len(nodes), len(elements), basis.length
-    ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
+    dof = 2 * n_nodes
+    _is, _js, _ks = [], [], []
+    ij = [(i, j) for i in range(n_stiffsize) for j in range(n_stiffsize)]
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
     t0 = time.time()
@@ -185,14 +183,16 @@ def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
                 start_time=t0)
         # time counter runs end
         ki = ks[i, :, :]
-        for ii in range(n_stiffsize):
-            for jj in range(n_stiffsize):
-                _i, _j = elements[i, ii], elements[i, jj]
-                ret[_i, _j] += ki[ii, jj]
-                ret[_i, _j + n_nodes] += ki[ii, jj + n_stiffsize]
-                ret[_i + n_nodes, _j] += ki[ii + n_stiffsize, jj]
-                ret[_i + n_nodes, _j + n_nodes] += ki[ii + n_stiffsize, jj +
-                                                      n_stiffsize]
+        for ii, jj in ij:
+            _i, _j = elements[i, ii], elements[i, jj]
+            _is.extend([_i, _i, _i + n_nodes, _i + n_nodes])
+            _js.extend([_j, _j + n_nodes, _j, _j + n_nodes])
+            _ks.extend([
+                ki[ii, jj], ki[ii, jj + n_stiffsize], ki[ii + n_stiffsize, jj],
+                ki[ii + n_stiffsize, jj + n_stiffsize]
+            ])
+    ret = sp.coo_matrix((np.array(_ks), (np.array(_is), np.array(_js))),
+                        shape=(dof, dof)).tocsr()
     # time counter summary begin
     tot = time.time() - t0
     print(f"        assembling completed. Total {utils.formatting_time(tot)}")
@@ -203,7 +203,9 @@ def mapping_element_stiffness_matrix(nodes, elements, basis, ks):
 def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
                                                  weight_handle, basis, ks):
     n_nodes, n_elements, n_stiffsize = len(nodes), len(elements), basis.length
-    ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
+    dof = 2 * n_nodes
+    _is, _js, _ks = [], [], []
+    ij = [(i, j) for i in range(n_stiffsize) for j in range(n_stiffsize)]
     # time counter init begin
     flag, flag_0 = [0.17 * n_elements for _ in range(2)]
     t0 = time.time()
@@ -218,18 +220,20 @@ def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
                 current_id=i,
                 total=n_elements,
                 start_time=t0)
+        # time counter runs end
         flag_i, weight_i = weight_handle(i)
         if flag_i == 1: continue
         di = (1 - weight_i(*centers[i])) * ks[i, :, :]
-        # time counter runs end
-        for ii in range(n_stiffsize):
-            for jj in range(n_stiffsize):
-                _i, _j = elements[i, ii], elements[i, jj]
-                ret[_i, _j] += di[ii, jj]
-                ret[_i, _j + n_nodes] += di[ii, jj + n_stiffsize]
-                ret[_i + n_nodes, _j] += di[ii + n_stiffsize, jj]
-                ret[_i + n_nodes, _j + n_nodes] += di[ii + n_stiffsize, jj +
-                                                      n_stiffsize]
+        for ii, jj in ij:
+            _i, _j = elements[i, ii], elements[i, jj]
+            _is.extend([_i, _i, _i + n_nodes, _i + n_nodes])
+            _js.extend([_j, _j + n_nodes, _j, _j + n_nodes])
+            _ks.extend([
+                di[ii, jj], di[ii, jj + n_stiffsize], di[ii + n_stiffsize, jj],
+                di[ii + n_stiffsize, jj + n_stiffsize]
+            ])
+    ret = sp.coo_matrix((np.array(_ks), (np.array(_is), np.array(_js))),
+                        shape=(dof, dof)).tocsr()
     # time counter summary begin
     tot = time.time() - t0
     print(

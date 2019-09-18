@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sp
 import time
 
 import hmsolver.utils as utils
@@ -39,19 +40,18 @@ def estimate_stiffness_matrix(mesh, basis, coef_fun):
         for i in range(n_elements)
     ]
     det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
+    kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
     i = n_elements // 2
     xi_local, yi_local = xy_local[i]
     pd_constitutive = np.array([0.0, 0.0, 0.0])
     for j in related[i]:
         xj_local, yj_local = xy_local[j]
-        for k in range(n_gauss):
-            for l in range(n_gauss):
-                # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
-                # because of w_[_] == 1
-                scale = det_jcb[i][k] * det_jcb[j][l]
-                pd_constitutive += scale * pd_constitutive_core(
-                    xi_local[k], yi_local[k], xj_local[l], yj_local[l],
-                    coef_fun)
+        for k, l in kl:
+            # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
+            # because of w_[_] == 1
+            scale = det_jcb[i][k] * det_jcb[j][l]
+            pd_constitutive += scale * pd_constitutive_core(
+                xi_local[k], yi_local[k], xj_local[l], yj_local[l], coef_fun)
     return pd_constitutive
 
 
@@ -60,6 +60,7 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
     w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_stiffsize, n_gauss = len(elements), basis.length, len(w_)
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
+    kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
     xy_local = [
         basis.transform(x_, y_, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
@@ -82,21 +83,24 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
         # time counter runs end
         xi_local, yi_local = xy_local[i]
         flag_i, weight_i = weight_handle(i)
+        if flag_i:
+            aks = np.array(
+                [weight_i(xi_local[k], yi_local[k]) for k in range(n_gauss)])
+        else:
+            aks = np.zeros(shape=(n_gauss))
         pd_constitutive_ij = np.array([0.0, 0.0, 0.0])
         for j in related[i]:
             xj_local, yj_local = xy_local[j]
             flag_j, weight_j = weight_handle(j)
             if flag_i == 0 and flag_j == 0: continue
-            for k in range(n_gauss):
-                ak = weight_i(xi_local[k], yi_local[k])
-                for l in range(n_gauss):
-                    al = weight_j(xj_local[l], yj_local[l])
-                    # scale = (ak - al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
-                    # because of w_[_] == 1
-                    scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
-                    pd_constitutive_ij += scale * pd_constitutive_core(
-                        xi_local[k], yi_local[k], xj_local[l], yj_local[l],
-                        coef_fun)
+            als = np.array(
+                [weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
+            for k, l in kl:
+                ak, al = aks[k], als[l]
+                scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
+                pd_constitutive_ij += scale * pd_constitutive_core(
+                    xi_local[k], yi_local[k], xj_local[l], yj_local[l],
+                    coef_fun)
         d_11 = np.vectorize(lambda x, y: pd_constitutive_ij[0])
         d_22 = np.vectorize(lambda x, y: pd_constitutive_ij[1])
         d_12 = np.vectorize(lambda x, y: pd_constitutive_ij[2])
@@ -118,25 +122,28 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
 def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
     w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
-    ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
-    zero1x4 = np.zeros(shape=(1, 4))
+    n_stiffsize = basis.length
+    dof = 2 * n_nodes
+    ret = np.zeros(shape=(dof, dof))
+    kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
+    zero1row = np.zeros(shape=(1, n_stiffsize))
     xy_local = [
         basis.transform(x_gauss, y_gauss, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    mapping = [
+    mapp = [
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
     det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
-        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
-        for _ in range(n_gauss)
+        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]),
+                   (1, n_stiffsize)) for _ in range(n_gauss)
     ]
     shapes = [
         np.vstack((np.hstack(
-            (shape0s[_], zero1x4)), np.hstack((zero1x4, shape0s[_]))))
+            (shape0s[_], zero1row)), np.hstack((zero1row, shape0s[_]))))
         for _ in range(n_gauss)
     ]
     # time counter init begin
@@ -155,92 +162,62 @@ def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
                 start_time=t0)
         # time counter runs end
         xi_local, yi_local = xy_local[i]
-        mapping_i = mapping[i]
+        mapp_i = mapp[i]
         ii_col, ii_row = [
-            np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_i)
+            np.reshape(_, (-1)) for _ in np.meshgrid(mapp_i, mapp_i)
         ]
-        # print("xi_local", xi_local)
-        # print("yi_local", yi_local)
-        # print("mapping[i]", mapping[i])
         for j in related[i]:
             xj_local, yj_local = xy_local[j]
             jj_col, ii_row = [
-                np.reshape(_, (-1))
-                for _ in np.meshgrid(mapping[j], mapping_i)
+                np.reshape(_, (-1)) for _ in np.meshgrid(mapp[j], mapp_i)
             ]
-            # print("xj_local", xj_local)
-            # print("yj_local", yj_local)
-            # print("mapping[j]", mapping[j])
             stiff_ii, stiff_ij = [
                 np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(2)
             ]
-            for k in range(n_gauss):
-                shape_k = shapes[k]
-                for l in range(n_gauss):
-                    shape_l = shapes[l]
-                    # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
-                    scale = det_jcb[i][k] * det_jcb[j][l]
-                    # scale = 1
-                    # because of w_[_] == 1
-                    core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
-                                       yj_local[l], coef_fun)
-                    stiff_ii += shape_k.T @ core @ shape_k
-                    stiff_ij += shape_k.T @ core @ shape_l
-                    # code without optim
-                    # stiff_kk = shape_k.T @ core @ shape_k
-                    # stiff_kl = shape_k.T @ core @ shape_l
-                    # stiff_lk = shape_l.T @ core @ shape_k
-                    # stiff_ll = shape_l.T @ core @ shape_l
-                    # ii_col, jj_row = [np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_j)]
-                    # jj_col, ii_row = [np.reshape(_, (-1)) for _ in np.meshgrid(mapping_j, mapping_i)]
-                    # ret[ii_row, ii_col] += np.reshape(stiff_kk, (-1))
-                    # ret[ii_row, jj_col] -= np.reshape(stiff_kl, (-1))
-                    # ret[jj_row, ii_col] -= np.reshape(stiff_lk, (-1))
-                    # ret[jj_row, jj_col] += np.reshape(stiff_ll, (-1))
-                    # print(f"bond ({i} -> {j}): gauss point pair ({k}) - ({l})")
-                    # print("core", core)
-                    # print("shape_k", shape_k)
-                    # print("shape_l", shape_l)
-                    # print("stiff_kk", stiff_kk)
-                    # print("stiff_kl", stiff_kl)
-                    # print("stiff_lk", stiff_lk)
-                    # print("stiff_ll", stiff_ll)
-                    # input()
+            for k, l in kl:
+                shape_k, shape_l = shapes[k], shapes[l]
+                # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
+                # because of w_[_] == 1
+                scale = det_jcb[i][k] * det_jcb[j][l]
+                core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
+                                   yj_local[l], coef_fun)
+                stiff_ii += shape_k.T @ core @ shape_k
+                stiff_ij += shape_k.T @ core @ shape_l
             ret[ii_row, ii_col] += np.reshape(stiff_ii, (-1))
             ret[ii_row, jj_col] -= np.reshape(stiff_ij, (-1))
-            # print(stiff_ii)
-            # input()
     # time counter summary begin
     tot = time.time() - t0
     print(f"        assembling completed. Total {utils.formatting_time(tot)}")
     # time counter summary end
-    return ret
-    # return ret / 2
+    return sp.csr_matrix(ret)
 
 
 def assemble_stiffness_matrix_with_weight(nodes, elements, related,
                                           weight_handle, coef_fun, basis):
     w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
-    ret = np.zeros(shape=(2 * n_nodes, 2 * n_nodes))
-    zero1x4 = np.zeros(shape=(1, 4))
+    n_stiffsize = basis.length
+    dof = 2 * n_nodes
+    ret = np.zeros(shape=(dof, dof))
+    kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
+    zero1row = np.zeros(shape=(1, n_stiffsize))
     xy_local = [
         basis.transform(x_gauss, y_gauss, nodes[elements[i, :], :], (0, 0))
         for i in range(n_elements)
     ]
-    mapping = [
+    mapp = [
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
     det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
-        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
-        for _ in range(n_gauss)
+        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]),
+                   (1, n_stiffsize)) for _ in range(n_gauss)
     ]
     shapes = [
         np.vstack((np.hstack(
-            (shape0s[_], zero1x4)), np.hstack((zero1x4, shape0s[_]))))
+            (shape0s[_], zero1row)), np.hstack((zero1row, shape0s[_]))))
         for _ in range(n_gauss)
     ]
     # time counter init begin
@@ -251,7 +228,7 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
         # time counter runs begin
         if i > flag:
             flag = utils.display_progress(
-                msg="        assembling stiffness martix pd",
+                msg="        assembling stiffness martix pd with weight",
                 current=flag,
                 display_sep=flag_0,
                 current_id=i,
@@ -259,49 +236,54 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
                 start_time=t0)
         # time counter runs end
         xi_local, yi_local = xy_local[i]
-        mapping_i = mapping[i]
+        mapp_i = mapp[i]
         ii_col, ii_row = [
-            np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_i)
+            np.reshape(_, (-1)) for _ in np.meshgrid(mapp_i, mapp_i)
         ]
         flag_i, weight_i = weight_handle(i)
+        if flag_i:
+            aks = np.array(
+                [weight_i(xi_local[k], yi_local[k]) for k in range(n_gauss)])
+        else:
+            aks = np.zeros(shape=(n_gauss))
         for j in related[i]:
             xj_local, yj_local = xy_local[j]
             jj_col, ii_row = [
-                np.reshape(_, (-1))
-                for _ in np.meshgrid(mapping[j], mapping_i)
+                np.reshape(_, (-1)) for _ in np.meshgrid(mapp[j], mapp_i)
             ]
             stiff_ii, stiff_ij = [
                 np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(2)
             ]
             flag_j, weight_j = weight_handle(j)
+
             if flag_i == 0 and flag_j == 0: continue
-            for k in range(n_gauss):
-                shape_k = shapes[k]
-                ak = weight_i(xi_local[k], yi_local[k])
-                for l in range(n_gauss):
-                    shape_l = shapes[l]
-                    al = weight_j(xj_local[l], yj_local[l])
-                    # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
-                    # because of w_[_] == 1
-                    scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
-                    core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
-                                       yj_local[l], coef_fun)
-                    stiff_ii += shape_k.T @ core @ shape_k
-                    stiff_ij += shape_k.T @ core @ shape_l
+            als = np.array(
+                [weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
+            for k, l in kl:
+                shape_k, shape_l = shapes[k], shapes[l]
+                ak, al = aks[k], als[l]
+                # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
+                # because of w_[_] == 1
+                scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
+                core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
+                                   yj_local[l], coef_fun)
+                stiff_ii += shape_k.T @ core @ shape_k
+                stiff_ij += shape_k.T @ core @ shape_l
             ret[ii_row, ii_col] += np.reshape(stiff_ii, (-1))
             ret[ii_row, jj_col] -= np.reshape(stiff_ij, (-1))
     # time counter summary begin
     tot = time.time() - t0
     print(f"        assembling completed. Total {utils.formatting_time(tot)}")
     # time counter summary end
-    return ret
+    return sp.csr_matrix(ret)
 
 
 def deal_bond_stretch(nodes,
                       elements,
                       related,
                       weight_handle,
-                      connection,
+                      connect_bond,
+                      connect_elem,
                       displace_field,
                       old_stiffness,
                       coef_fun,
@@ -309,7 +291,10 @@ def deal_bond_stretch(nodes,
                       s_crit=1.1):
     w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
-    zero1x4 = np.zeros(shape=(1, 4))
+    n_stiffsize = basis.length
+    old_stiffness = old_stiffness.todense()
+    # kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
+    zero1row = np.zeros(shape=(1, n_stiffsize))
     endpoints, broken_bond_cnt = [], 0
     xy_local = [
         basis.transform(x_gauss, y_gauss, nodes[elements[i, :], :], (0, 0))
@@ -319,19 +304,19 @@ def deal_bond_stretch(nodes,
         basis.transform(x_gauss, y_gauss, displace_field[elements[i, :], :],
                         (0, 0)) for i in range(n_elements)
     ]
-    mapping = [
+    mapp = [
         np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
         for i in range(n_elements)
     ]
     jacobis = preprocessing_all_jacobi(nodes, elements, basis)
     det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
     shape0s = [
-        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]), (1, 4))
-        for _ in range(n_gauss)
+        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]),
+                   (1, n_stiffsize)) for _ in range(n_gauss)
     ]
     shapes = [
         np.vstack((np.hstack(
-            (shape0s[_], zero1x4)), np.hstack((zero1x4, shape0s[_]))))
+            (shape0s[_], zero1row)), np.hstack((zero1row, shape0s[_]))))
         for _ in range(n_gauss)
     ]
     # time counter init begin
@@ -346,37 +331,44 @@ def deal_bond_stretch(nodes,
                 msg="        dealing with bond stretch",
                 current=flag,
                 display_sep=flag_0,
-                current_id=i,
+                current_id=int(i * (2 - i / n_elements)),
                 total=n_elements,
                 start_time=t0)
         # time counter runs end
         xi, yi = xy_local[i]
         uxi, uyi = uxuy_local[i]
-        mapping_i = mapping[i]
+        mapp_i = mapp[i]
         ii_col, ii_row = [
-            np.reshape(_, (-1)) for _ in np.meshgrid(mapping_i, mapping_i)
+            np.reshape(_, (-1)) for _ in np.meshgrid(mapp_i, mapp_i)
         ]
         flag_i, weight_i = weight_handle(i)
+        # if flag_i:
+        # aks = np.array([weight_i(xi[k], yi[k]) for k in range(n_gauss)])
+        # else:
+        # aks = np.zeros(shape=(n_gauss))
         for j in related[i]:
+            if i > j: continue
+            if connect_elem[i, j] == 0: continue
             bond_break = False
             xj, yj = xy_local[j]
             uxj, uyj = uxuy_local[j]
-            mapping_j = mapping[j]
+            mapp_j = mapp[j]
             jj_col, jj_row = [
-                np.reshape(_, (-1)) for _ in np.meshgrid(mapping_j, mapping_j)
+                np.reshape(_, (-1)) for _ in np.meshgrid(mapp_j, mapp_j)
             ]
-            # jj_col, ii_row = [np.reshape(_, (-1)) for _ in np.meshgrid(mapping[j], mapping_i)]
+            # jj_col, ii_row = [np.reshape(_, (-1)) for _ in np.meshgrid(mapp[j], mapp_i)]
             stiff_ii, stiff_ij, stiff_jj = [
                 np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(3)
             ]
             # stiff_ii, stiff_ij = [np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(2)]
             flag_j, weight_j = weight_handle(j)
             if flag_i == 0 and flag_j == 0: continue
+            # als = np.array([weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
             for k in range(n_gauss):
                 shape_k = shapes[k]
                 ak = weight_i(xi[k], yi[k])
                 for l in range(n_gauss):
-                    if not connection[i, j, k, l]: continue
+                    if not connect_bond[i, j, k, l]: continue
                     b_x, b_y = xi[k] - xj[l], yi[k] - yj[l]
                     b_nx, b_ny = uxi[k] - uxj[l] + b_x, uyi[k] - uyj[l] + b_y
                     b_abs = np.sqrt(b_x * b_x + b_y * b_y)
@@ -385,7 +377,6 @@ def deal_bond_stretch(nodes,
                     stretch_max = max(stretch_max, stretch_ijkl)
                     if stretch_ijkl <= s_crit:
                         continue
-                    # print(f"            element ({i}, {j}) bond ({k}, {l}): stretch= {stretch_ijkl:.2f}, break!!")
                     shape_l = shapes[l]
                     al = weight_j(xj[l], yj[l])
                     # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
@@ -397,9 +388,11 @@ def deal_bond_stretch(nodes,
                     stiff_ij -= shape_k.T @ core @ shape_l
                     stiff_jj -= shape_l.T @ core @ shape_l
                     broken_bond_cnt += 1
-                    connection[i, j, k, l] = False
-                    connection[j, i, l, k] = False
                     bond_break = True
+                    connect_bond[i, j, k, l] = False
+                    connect_bond[j, i, l, k] = False
+                    connect_elem[i, j] -= 1
+                    connect_elem[j, i] -= 1
             if bond_break:
                 endpoints.append(i)
                 endpoints.append(j)
@@ -413,8 +406,7 @@ def deal_bond_stretch(nodes,
         f"        dealing with bond stretch completed. Total {utils.formatting_time(tot)}"
     )
     # time counter summary end
-
     if len(endpoints) > 0:
         endpoints = list(set(endpoints))
     print(f"        stretch_max={stretch_max}")
-    return endpoints, broken_bond_cnt
+    return endpoints, broken_bond_cnt, sp.csr_matrix(old_stiffness)

@@ -1,4 +1,7 @@
 import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
+import scipy.io as sio
 import pickle
 import time
 import os
@@ -48,8 +51,15 @@ def assemble_load_vector(n_nodes):
 
 
 def solve_linear_system(a, b):
-    u = np.reshape(np.linalg.pinv(a) @ b, (2, -1)).T
-    # u = np.reshape(np.linalg.solve(a, b), (2, -1)).T
+    t0 = time.time()
+    print(f"Solving Linear System: DOF={len(b)}.")
+    if sp.isspmatrix(a):
+        u = np.reshape(spla.spsolve(a.tocsr(), b), (2, -1)).T
+    else:
+        u = np.reshape(spla.spsolve(sp.csr_matrix(a), b), (2, -1)).T
+    print(
+        f"Linear System Solved. Time cost= {utils.formatting_time(time.time() - t0)}"
+    )
     return u
 
 
@@ -66,10 +76,11 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     b = assemble_load_vector(n_nodes)
     pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-before.bin", "wb"))
     if isinstance(bconds, BoundaryConds2d):
-        bconds.compile(p).apply(a0, b, p, boundary_scale)
+        a0, b = bconds.compile(p).apply(a0.tolil(), b, p, boundary_scale)
     elif isinstance(bconds, CompiledBoundaryConds2d):
-        bconds.apply(a0, b, p, boundary_scale)
+        a0, b = bconds.apply(a0.tolil(), b, p, boundary_scale)
     pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-final.bin", "wb"))
+    # a0, b = pickle.load(open(f"ESM-{n_elements}-elements-final.bin", "rb"))
     u = solve_linear_system(a0, b)
     return u
 
@@ -84,9 +95,9 @@ def peridynamic(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     a0 = pickle.load(open(f'PDSM-{n_elements}-elements.bin', "rb"))
     b = assemble_load_vector(n_nodes)
     if isinstance(bconds, BoundaryConds2d):
-        bconds.compile(p).apply(a0, b, p, boundary_scale)
+        a0, b = bconds.compile(p).apply(a0.tolil(), b, p, boundary_scale)
     elif isinstance(bconds, CompiledBoundaryConds2d):
-        bconds.apply(a0, b, p, boundary_scale)
+        a0, b = bconds.apply(a0.tolil(), b, p, boundary_scale)
     u = solve_linear_system(a0, b)
     return u
 
@@ -113,9 +124,9 @@ def hybrid(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     a = accumulate_stiffness_matrix(a0, apd)
     b = assemble_load_vector(n_nodes)
     if isinstance(bconds, BoundaryConds2d):
-        bconds.compile(p).apply(a0, b, p, boundary_scale)
+        a, b = bconds.compile(p).apply(a.tolil(), b, p, boundary_scale)
     elif isinstance(bconds, CompiledBoundaryConds2d):
-        bconds.apply(a0, b, p, boundary_scale)
+        a, b = bconds.apply(a.tolil(), b, p, boundary_scale)
     u = solve_linear_system(a, b)
     return u
 
@@ -148,29 +159,30 @@ def simulate_phase(max_iter: int,
                                                 coeff, basis)
     a0 = accumulate_stiffness_matrix(a0, -a1)
     is_first = True
-    connection = np.ones(shape=(n_elements, n_elements, n_gauss, n_gauss),
-                         dtype=np.bool)
-    broken_endpoint = []
-    all_broken_endpoint = []
+    connect_bond = np.ones(shape=(n_elements, n_elements, n_gauss, n_gauss),
+                           dtype=np.bool)
+    connect_elem = 16 * np.ones(shape=(n_elements, n_elements), dtype=np.int32)
+    broken_ep = []  # broken_endpoint
+    all_broken_ep = []  # all_broken_endpoint
     for ii in range(max_iter):
-        if (not is_first) and len(broken_endpoint) <= 0:
+        if (not is_first) and len(broken_ep) <= 0:
             break
         t0 = time.time()
         a = accumulate_stiffness_matrix(a0, apd)
         b = assemble_load_vector(n_nodes)
-        compiled_bconds.apply(a, b, p, boundary_scale)
+        a, b = compiled_bconds.apply(a.tolil(), b, p, boundary_scale)
         u = solve_linear_system(a, b)
-        broken_endpoint, cnt = deal_bond_stretch(p, t, related, weight_handle,
-                                                 connection, u, apd, coeff,
-                                                 basis, s_crit)
-        all_broken_endpoint.extend(broken_endpoint)
+        broken_ep, cnt, apd = deal_bond_stretch(p, t, related, weight_handle,
+                                                connect_bond, connect_elem, u,
+                                                apd, coeff, basis, s_crit)
+        all_broken_ep.extend(broken_ep)
         is_first = False
         tot = time.time() - t0
         print(f"    Phase {phase_id:2d}, Runtime {runtime_id:2d}", end="")
         print(f", Iteration {ii:4d}: total broken bonds {cnt:8d}", end="")
         print(f", total time cost {utils.formatting_time(tot)}")
-    all_broken_endpoint = list(set(all_broken_endpoint))
-    return u, all_broken_endpoint
+    all_broken_ep = list(set(all_broken_ep))
+    return u, all_broken_ep
 
 
 def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
@@ -191,11 +203,10 @@ def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
         while flag:
             flag = False
             cbonds = bconds.compile(mesh2D.nodes)
-            u, all_broken_endpoint = simulate_phase(max_iter, phase,
-                                                    runtime_id, mesh2D,
-                                                    material2D, cbonds, basis,
-                                                    boundary_scale)
-            for c_index in all_broken_endpoint:
+            u, all_broken_ep = simulate_phase(max_iter, phase, runtime_id,
+                                              mesh2D, material2D, cbonds,
+                                              basis, boundary_scale)
+            for c_index in all_broken_ep:
                 if contains_weight_function[c_index]: continue
                 flag = True
                 mesh2D.manual_set_rule_at_element(c_index)
@@ -209,7 +220,6 @@ def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
         )
         p, t = mesh2D.nodes, mesh2D.elements
         n_nodes, n_elements = mesh2D.n_nodes, mesh2D.n_elements
-
         # postprocessing
         u_abs = get_absolute_displace(u)
         p_deform = get_deform_mesh(p, u)
@@ -239,7 +249,6 @@ def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
         export_tecplot_data(
             f"{app_name}-simulate-phase-{phase:02d}-{n_elements}-elements-alpha-exactly.dat",
             alpha_cfg, p, t, w_exact)
-
     print(
         f"total phase {TOTAL_PHASES}, total time cost {utils.formatting_time(time.time() - start_timestamp)}"
     )
