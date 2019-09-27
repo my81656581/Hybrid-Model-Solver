@@ -47,6 +47,8 @@ class HybridMesh2d(PrototypePdMesh2d):
         self.__ruler_ = [-1 for _ in range(self.n_elements)]
         self.__alpha_rules_ = []
         d, r0, r1 = self.horizon_radius, self.horizon_radius, self.outer_radius
+        self.__default_r0 = r0
+        self.__default_r1 = r1
         self.__default_slope_ = 1.0 / (r0 - r1 + d)
         self.__default_yintercept_ = (r1 - d) / (r1 - d - r0)
 
@@ -85,6 +87,7 @@ class HybridMesh2d(PrototypePdMesh2d):
 
     def convert_mesh_into_DGFEM(self, todolist):
         for e_idx in todolist:
+            if self.__is_dgfem_[e_idx]: continue
             vertices = self.elements[e_idx, :]
             for vertex in vertices:
                 adjoint_elements = self.adjoint[vertex]
@@ -121,14 +124,14 @@ class HybridMesh2d(PrototypePdMesh2d):
         assert len(args) == 0 or len(args) == 2
         if len(args) == 2:
             radius0, radius1 = args
-            if radius0 == self.horizon_radius and radius1 == self.outer_radius:
+            if radius0 == self.__default_r0 and radius1 == self.__default_r1:
                 slope, y_intercept = self.__default_slope_, self.__default_yintercept_
             else:
                 hoge = radius1 - self.horizon_radius
                 piyo = hoge - radius0
                 slope, y_intercept = -1.0 / piyo, hoge / piyo
         else:
-            radius0, radius1 = self.horizon_radius, self.outer_radius
+            radius0, radius1 = self.__default_r0, self.__default_r1
             slope, y_intercept = self.__default_slope_, self.__default_yintercept_
 
         def weight_function(x: np.ndarray, y: np.ndarray) -> float:
@@ -194,6 +197,9 @@ class HybridMesh2d(PrototypePdMesh2d):
                               self.bonds[element_idx],
                               (self.__interface_ring_[element_idx]
                                | self.__inner_circle_[element_idx]))
+        # self.__maintain_ruler(ruler_id, weight_function,
+        #                       self.__inner_circle_[element_idx],
+        #                       self.__interface_ring_[element_idx])
         # (self.__inner_circle_[element_idx]))
         # (self.__interface_ring_[element_idx]))
         return True
