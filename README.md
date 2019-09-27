@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.4.0a0-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -17,14 +17,10 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 
 ## Update Log(Most Recent)
 
-![Version](https://img.shields.io/badge/pre--release-0.4.0a0-brightgreen.svg)
-* It's a stable version and much faster than before, so upgrade into 0.4*
-* **DEV**: *Improvement*. It now obeys [PEP400](https://www.python.org/dev/peps/pep-0440/) for version identification and dependency specification.
-* **DEV**: *Improvement*. It's now using another way to apply the boundary condition.
-* **DEV**: *Improvement*. It will return Stiffness Matrix and Loads Vector in stand of unsafe reference manipulating.
-* **DEV**: *Improvement*. It will use `scipy.sparse` and `scipy.sparse.linalg` to assemble Stiffness Matrix. It's much faster, saving about 30% time cost.
-* **DEV**: *Improvement*. Because of the defination of bonds, it can just run half of bond stretch test. This trick saves about 40% time cost.
-* **DEV**: *Improvement*. Move the useless code to recycle bin folder.
+![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
+* **DOC**: *Improvement*. Add the mesh data of example-04.
+* **DEV**: *Improvement*. It's now using another way to run the simulation lazily. It runs until it needs.
+* **DEV**: *Code Beautification*. I rewrote the weighting function section to make it clearer than before.
 
 [(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
 

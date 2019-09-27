@@ -1,5 +1,10 @@
 # Update Log
 
+* 2019-09-27 ![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
+  * **DOC**: *Improvement*. Add the mesh data of example-04.
+  * **DEV**: *Improvement*. It's now using another way to run the simulation lazily. It runs until it needs.
+  * **DEV**: *Code Beautification*. I rewrote the weighting function section to make it clearer than before.
+
 * 2019-09-18 ![Version](https://img.shields.io/badge/pre--release-0.4.0a0-brightgreen.svg)
   * It's a stable version and much faster than before, so upgrade into 0.4*
   * **DEV**: *Improvement*. It now obeys [PEP400](https://www.python.org/dev/peps/pep-0440/) for version identification and dependency specification.
