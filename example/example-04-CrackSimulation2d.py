@@ -1,3 +1,6 @@
+import zipfile
+import os
+
 import numpy as np
 
 import hmsolver.geometry as geometry
@@ -20,6 +23,13 @@ if __name__ == '__main__':
     zone = Zone2d(zone_xl, zone_xr, zone_yl, zone_yr)
 
     input_file = 'data_2100_2000.msh'
+    if not os.path.exists(input_file):
+        zip_archive = 'data_2100_2000.zip'
+        if not os.path.exists(zip_archive):
+            raise Exception('no available data found.')
+        else:
+            ziphandle = zipfile.ZipFile('data_2100_2000.zip', 'r')
+            ziphandle.extract(input_file)
     n_nodes, n_elements, nodes, elements = read_mesh(input_file)
     mesh2d = HybridMesh2d(n_nodes, n_elements)
     mesh2d.manually_construct(np.array(nodes), np.array(elements))
