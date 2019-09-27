@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
-import scipy.io as sio
 import pickle
 import time
 import os
@@ -15,13 +14,13 @@ from hmsolver.femcore.stiffness import preprocessing_all_jacobi
 from hmsolver.femcore.stiffness import generate_stiffness_matrix_k0
 from hmsolver.femcore.stiffness import mapping_element_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1
+from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1_with_connection
 from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix_with_weight
+from hmsolver.femcore.pd_stiffness import assemble_stiffness_matrix_with_weight_and_connection
 from hmsolver.femcore.pd_stiffness import deal_bond_stretch
-
 from hmsolver.femcore.treat_boundary import CompiledBoundaryConds2d
 from hmsolver.femcore.treat_boundary import BoundaryConds2d
-
 from hmsolver.femcore.postprocessing import get_absolute_displace
 from hmsolver.femcore.postprocessing import get_strain_field
 from hmsolver.femcore.postprocessing import get_stress_field
@@ -29,6 +28,7 @@ from hmsolver.femcore.postprocessing import get_distortion_energy
 from hmsolver.femcore.postprocessing import convert_distortion_energy_for_element
 from hmsolver.femcore.postprocessing import maximum_distortion_energy_criterion
 from hmsolver.femcore.postprocessing import get_deform_mesh
+from hmsolver.femcore.postprocessing import get_local_damage
 from hmsolver.femcore.postprocessing import generate_tecplot_config
 from hmsolver.femcore.postprocessing import export_tecplot_data
 
@@ -138,9 +138,9 @@ def simulate_phase(max_iter: int,
                    material2D,
                    compiled_bconds,
                    basis,
+                   connection,
                    boundary_scale=1.0):
     n_nodes, n_elements = mesh2D.n_nodes, mesh2D.n_elements
-    n_gauss = len(gauss_point_quadrature_standard()[0])
     p, t, related = mesh2D.nodes, mesh2D.elements, mesh2D.bonds
     weight_handle = mesh2D.query_alpha
     constitutive = material2D.constitutive
@@ -151,17 +151,16 @@ def simulate_phase(max_iter: int,
         ks0 = generate_stiffness_matrix_k0(p, t, constitutive, basis, jacobis)
         pickle.dump(ks0, open(f"ESM-{n_elements}-elements.bin", "wb"))
     as0 = pickle.load(open(f'ESM-{n_elements}-elements.bin', "rb"))
-    as1 = generate_stiffness_matrix_k1(p, t, related, weight_handle, coeff,
-                                       basis, jacobis)
+    as1 = generate_stiffness_matrix_k1_with_connection(p, t, related,
+                                                       connection,
+                                                       weight_handle, coeff,
+                                                       basis, jacobis)
     a0 = mapping_element_stiffness_matrix(p, t, basis, as0)
     a1 = mapping_element_stiffness_matrix(p, t, basis, as1)
-    apd = assemble_stiffness_matrix_with_weight(p, t, related, weight_handle,
-                                                coeff, basis)
+    apd = assemble_stiffness_matrix_with_weight_and_connection(
+        p, t, related, connection, weight_handle, coeff, basis)
     a0 = accumulate_stiffness_matrix(a0, -a1)
     is_first = True
-    connect_bond = np.ones(shape=(n_elements, n_elements, n_gauss, n_gauss),
-                           dtype=np.bool)
-    connect_elem = 16 * np.ones(shape=(n_elements, n_elements), dtype=np.int32)
     broken_ep = []  # broken_endpoint
     all_broken_ep = []  # all_broken_endpoint
     for ii in range(max_iter):
@@ -172,9 +171,9 @@ def simulate_phase(max_iter: int,
         b = assemble_load_vector(n_nodes)
         a, b = compiled_bconds.apply(a.tolil(), b, p, boundary_scale)
         u = solve_linear_system(a, b)
-        broken_ep, cnt, apd = deal_bond_stretch(p, t, related, weight_handle,
-                                                connect_bond, connect_elem, u,
-                                                apd, coeff, basis, s_crit)
+        broken_ep, cnt, apd, connection = deal_bond_stretch(
+            p, t, related, weight_handle, connection, u, apd, coeff, basis,
+            s_crit)
         all_broken_ep.extend(broken_ep)
         is_first = False
         tot = time.time() - t0
@@ -182,17 +181,17 @@ def simulate_phase(max_iter: int,
         print(f", Iteration {ii:4d}: total broken bonds {cnt:8d}", end="")
         print(f", total time cost {utils.formatting_time(tot)}")
     all_broken_ep = list(set(all_broken_ep))
-    return u, all_broken_ep
+    return u, all_broken_ep, connection
 
 
-def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
-    app_name, n_dgfe, contains_weight_function = app_configs
-    total_phases, max_iter = simulate_configs
+def simulate(mesh2D, material2D, bconds, basis, app_data, simulate_configs):
+    n_dgfe, contains_weight_function, connection = app_data
+    app_name, total_phases, max_iter = simulate_configs
     youngs_modulus = material2D.youngs_modulus
     poissons_ratio = material2D.poissons_ratio
     constitutive = material2D.constitutive
-    n_elements = mesh2D.n_elements
     w_, xg, yg = gauss_point_quadrature_standard()
+    n_elements = mesh2D.n_elements
     contains_weight_function = [False for _ in range(n_elements)]
     start_timestamp = time.time()
     for phase in range(total_phases):
@@ -203,9 +202,9 @@ def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
         while flag:
             flag = False
             cbonds = bconds.compile(mesh2D.nodes)
-            u, all_broken_ep = simulate_phase(max_iter, phase, runtime_id,
-                                              mesh2D, material2D, cbonds,
-                                              basis, boundary_scale)
+            u, all_broken_ep, connection = simulate_phase(
+                max_iter, phase, runtime_id, mesh2D, material2D, cbonds, basis,
+                connection, boundary_scale)
             for c_index in all_broken_ep:
                 if contains_weight_function[c_index]: continue
                 flag = True
@@ -252,4 +251,4 @@ def simulate(mesh2D, material2D, bconds, basis, app_configs, simulate_configs):
     print(
         f"total phase {TOTAL_PHASES}, total time cost {utils.formatting_time(time.time() - start_timestamp)}"
     )
-    return u, n_dgfe
+    return u, n_dgfe, connection

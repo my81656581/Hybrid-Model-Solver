@@ -12,8 +12,22 @@ from hmsolver.femcore.stiffness import element_sitffness_matrix
 __all__ = [
     'xi2', 'pd_constitutive_core', 'estimate_stiffness_matrix',
     'generate_stiffness_matrix_k1', 'assemble_stiffness_matrix',
-    'assemble_stiffness_matrix_with_weight', 'deal_bond_stretch'
+    'assemble_stiffness_matrix_with_weight', 'deal_bond_stretch',
+    'generate_stiffness_matrix_k1_with_connection',
+    'assemble_stiffness_matrix_with_weight_and_connection'
 ]
+
+
+@utils.SingletonDecorator
+class FakeFullConnection(object):
+    def __getitem__(self, _):
+        return True
+
+
+@utils.SingletonDecorator
+class FakeWeightFunction(object):
+    def __call__(self, _):
+        return 1, np.vectorize(lambda x, y: 1)
 
 
 def xi2(xi, yi, xj, yj, coef_fun):
@@ -57,6 +71,22 @@ def estimate_stiffness_matrix(mesh, basis, coef_fun):
 
 def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
                                  coef_fun, basis, jacobis):
+    return _generate_stiffness_matrix_k1_core(
+        nodes, elements, related, FakeFullConnection(), weight_handle,
+        coef_fun, basis, jacobis, "        build stiffness martix k1")
+
+
+def generate_stiffness_matrix_k1_with_connection(nodes, elements, related,
+                                                 connection, weight_handle,
+                                                 coef_fun, basis, jacobis):
+    return _generate_stiffness_matrix_k1_core(
+        nodes, elements, related, connection, weight_handle, coef_fun, basis,
+        jacobis, "        build stiffness martix k1 with connection")
+
+
+def _generate_stiffness_matrix_k1_core(nodes, elements, related, connection,
+                                       weight_handle, coef_fun, basis, jacobis,
+                                       log_msg):
     w_, x_, y_ = gauss_point_quadrature_standard()
     n_elements, n_stiffsize, n_gauss = len(elements), basis.length, len(w_)
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
@@ -73,13 +103,12 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
     for i in range(n_elements):
         # time counter runs begin
         if i > flag:
-            flag = utils.display_progress(
-                msg="        build stiffness martix k1",
-                current=flag,
-                display_sep=flag_0,
-                current_id=i,
-                total=n_elements,
-                start_time=t0)
+            flag = utils.display_progress(msg=log_msg,
+                                          current=flag,
+                                          display_sep=flag_0,
+                                          current_id=i,
+                                          total=n_elements,
+                                          start_time=t0)
         # time counter runs end
         xi_local, yi_local = xy_local[i]
         flag_i, weight_i = weight_handle(i)
@@ -96,6 +125,7 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
             als = np.array(
                 [weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
             for k, l in kl:
+                if not connection[i, j, k, l]: continue
                 ak, al = aks[k], als[l]
                 scale = (ak + al) / 2 * det_jcb[i][k] * det_jcb[j][l]
                 pd_constitutive_ij += scale * pd_constitutive_core(
@@ -120,80 +150,27 @@ def generate_stiffness_matrix_k1(nodes, elements, related, weight_handle,
 
 
 def assemble_stiffness_matrix(nodes, elements, related, coef_fun, basis):
-    w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
-    n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
-    n_stiffsize = basis.length
-    dof = 2 * n_nodes
-    ret = np.zeros(shape=(dof, dof))
-    kl = [(k, l) for k in range(n_gauss) for l in range(n_gauss)]
-    zero1row = np.zeros(shape=(1, n_stiffsize))
-    xy_local = [
-        basis.transform(x_gauss, y_gauss, nodes[elements[i, :], :], (0, 0))
-        for i in range(n_elements)
-    ]
-    mapp = [
-        np.reshape(np.hstack((elements[i, :], elements[i, :] + n_nodes)), (-1))
-        for i in range(n_elements)
-    ]
-    jacobis = preprocessing_all_jacobi(nodes, elements, basis)
-    det_jcb = preprocessing_all_jacobi_det(n_elements, n_gauss, jacobis)
-    shape0s = [
-        np.reshape(basis.shape_vector(x_gauss[_], y_gauss[_]),
-                   (1, n_stiffsize)) for _ in range(n_gauss)
-    ]
-    shapes = [
-        np.vstack((np.hstack(
-            (shape0s[_], zero1row)), np.hstack((zero1row, shape0s[_]))))
-        for _ in range(n_gauss)
-    ]
-    # time counter init begin
-    flag, flag_0 = [0.17 * n_elements for _ in range(2)]
-    t0 = time.time()
-    # time counter init end
-    for i in range(n_elements):
-        # time counter runs begin
-        if i > flag:
-            flag = utils.display_progress(
-                msg="        assembling stiffness martix pd",
-                current=flag,
-                display_sep=flag_0,
-                current_id=i,
-                total=n_elements,
-                start_time=t0)
-        # time counter runs end
-        xi_local, yi_local = xy_local[i]
-        mapp_i = mapp[i]
-        ii_col, ii_row = [
-            np.reshape(_, (-1)) for _ in np.meshgrid(mapp_i, mapp_i)
-        ]
-        for j in related[i]:
-            xj_local, yj_local = xy_local[j]
-            jj_col, ii_row = [
-                np.reshape(_, (-1)) for _ in np.meshgrid(mapp[j], mapp_i)
-            ]
-            stiff_ii, stiff_ij = [
-                np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(2)
-            ]
-            for k, l in kl:
-                shape_k, shape_l = shapes[k], shapes[l]
-                # scale = w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
-                # because of w_[_] == 1
-                scale = det_jcb[i][k] * det_jcb[j][l]
-                core = scale * xi2(xi_local[k], yi_local[k], xj_local[l],
-                                   yj_local[l], coef_fun)
-                stiff_ii += shape_k.T @ core @ shape_k
-                stiff_ij += shape_k.T @ core @ shape_l
-            ret[ii_row, ii_col] += np.reshape(stiff_ii, (-1))
-            ret[ii_row, jj_col] -= np.reshape(stiff_ij, (-1))
-    # time counter summary begin
-    tot = time.time() - t0
-    print(f"        assembling completed. Total {utils.formatting_time(tot)}")
-    # time counter summary end
-    return sp.csr_matrix(ret)
+    return _assemble_stiffness_matrix_core(
+        nodes, elements, related, FakeFullConnection(), FakeWeightFunction(),
+        coef_fun, basis, "        assembling PD-stiffness martix")
 
 
 def assemble_stiffness_matrix_with_weight(nodes, elements, related,
                                           weight_handle, coef_fun, basis):
+    return _assemble_stiffness_matrix_core(
+        nodes, elements, related, FakeFullConnection(), weight_handle,
+        coef_fun, basis, "        assembling PD-stiffness martix with weight")
+
+
+def assemble_stiffness_matrix_with_weight_and_connection(
+        nodes, elements, related, connection, weight_handle, coef_fun, basis):
+    return _assemble_stiffness_matrix_core(
+        nodes, elements, related, connection, weight_handle, coef_fun, basis,
+        "        assembling PD-stiffness martix with weight & connection")
+
+
+def _assemble_stiffness_matrix_core(nodes, elements, related, connection,
+                                    weight_handle, coef_fun, basis, log_msg):
     w_, x_gauss, y_gauss = gauss_point_quadrature_standard()
     n_nodes, n_elements, n_gauss = len(nodes), len(elements), len(w_)
     n_stiffsize = basis.length
@@ -227,13 +204,13 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
     for i in range(n_elements):
         # time counter runs begin
         if i > flag:
-            flag = utils.display_progress(
-                msg="        assembling stiffness martix pd with weight",
-                current=flag,
-                display_sep=flag_0,
-                current_id=i,
-                total=n_elements,
-                start_time=t0)
+            flag = utils.display_progress(msg=log_msg,
+                                          current=flag,
+                                          display_sep=flag_0,
+                                          current_id=int(i *
+                                                         (2 - i / n_elements)),
+                                          total=n_elements,
+                                          start_time=t0)
         # time counter runs end
         xi_local, yi_local = xy_local[i]
         mapp_i = mapp[i]
@@ -247,19 +224,21 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
         else:
             aks = np.zeros(shape=(n_gauss))
         for j in related[i]:
+            if i > j: continue
+            mapp_j = mapp[j]
             xj_local, yj_local = xy_local[j]
-            jj_col, ii_row = [
-                np.reshape(_, (-1)) for _ in np.meshgrid(mapp[j], mapp_i)
+            jj_col, jj_row = [
+                np.reshape(_, (-1)) for _ in np.meshgrid(mapp_j, mapp_j)
             ]
-            stiff_ii, stiff_ij = [
-                np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(2)
+            stiff_ii, stiff_ij, stiff_jj = [
+                np.zeros(shape=(2 * n_gauss, 2 * n_gauss)) for _ in range(3)
             ]
             flag_j, weight_j = weight_handle(j)
-
             if flag_i == 0 and flag_j == 0: continue
             als = np.array(
                 [weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
             for k, l in kl:
+                if not connection[i, j, k, l]: continue
                 shape_k, shape_l = shapes[k], shapes[l]
                 ak, al = aks[k], als[l]
                 # scale = (ak + al) / 2 * w_[k] * w_[l] * det_jcb[i][k] * det_jcb[j][l]
@@ -269,8 +248,11 @@ def assemble_stiffness_matrix_with_weight(nodes, elements, related,
                                    yj_local[l], coef_fun)
                 stiff_ii += shape_k.T @ core @ shape_k
                 stiff_ij += shape_k.T @ core @ shape_l
+                stiff_jj += shape_l.T @ core @ shape_l
             ret[ii_row, ii_col] += np.reshape(stiff_ii, (-1))
             ret[ii_row, jj_col] -= np.reshape(stiff_ij, (-1))
+            ret[jj_row, ii_col] -= np.reshape(stiff_ij.T, (-1))
+            ret[jj_row, jj_col] += np.reshape(stiff_jj, (-1))
     # time counter summary begin
     tot = time.time() - t0
     print(f"        assembling completed. Total {utils.formatting_time(tot)}")
@@ -282,8 +264,7 @@ def deal_bond_stretch(nodes,
                       elements,
                       related,
                       weight_handle,
-                      connect_bond,
-                      connect_elem,
+                      connection,
                       displace_field,
                       old_stiffness,
                       coef_fun,
@@ -348,7 +329,6 @@ def deal_bond_stretch(nodes,
         # aks = np.zeros(shape=(n_gauss))
         for j in related[i]:
             if i > j: continue
-            if connect_elem[i, j] == 0: continue
             bond_break = False
             xj, yj = xy_local[j]
             uxj, uyj = uxuy_local[j]
@@ -368,7 +348,7 @@ def deal_bond_stretch(nodes,
                 shape_k = shapes[k]
                 ak = weight_i(xi[k], yi[k])
                 for l in range(n_gauss):
-                    if not connect_bond[i, j, k, l]: continue
+                    if not connection[i, j, k, l]: continue
                     b_x, b_y = xi[k] - xj[l], yi[k] - yj[l]
                     b_nx, b_ny = uxi[k] - uxj[l] + b_x, uyi[k] - uyj[l] + b_y
                     b_abs = np.sqrt(b_x * b_x + b_y * b_y)
@@ -389,10 +369,8 @@ def deal_bond_stretch(nodes,
                     stiff_jj -= shape_l.T @ core @ shape_l
                     broken_bond_cnt += 1
                     bond_break = True
-                    connect_bond[i, j, k, l] = False
-                    connect_bond[j, i, l, k] = False
-                    connect_elem[i, j] -= 1
-                    connect_elem[j, i] -= 1
+                    connection[i, j, k, l] = False
+                    connection[j, i, l, k] = False
             if bond_break:
                 endpoints.append(i)
                 endpoints.append(j)
@@ -409,4 +387,4 @@ def deal_bond_stretch(nodes,
     if len(endpoints) > 0:
         endpoints = list(set(endpoints))
     print(f"        stretch_max={stretch_max}")
-    return endpoints, broken_bond_cnt, sp.csr_matrix(old_stiffness)
+    return endpoints, broken_bond_cnt, sp.csr_matrix(old_stiffness), connection
