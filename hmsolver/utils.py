@@ -44,6 +44,18 @@ def log(func):
     return wrapper
 
 
+def SingletonDecorator(cls):
+    _instance = None
+
+    def get_instance(*args, **kwargs):
+        nonlocal _instance
+        if _instance is None:
+            _instance = cls(*args, **kwargs)
+        return _instance
+
+    return get_instance
+
+
 def display_progress(msg, current, display_sep, current_id, total, start_time):
     current += display_sep
     percentage = current_id / total
