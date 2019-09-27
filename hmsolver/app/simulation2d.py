@@ -17,6 +17,7 @@ __all__ = ['Simulation2d', 'PdSimulation2d', 'CrackSimulation2d']
 HEADER = {
     "displace_field": "Ux, Uy",
     "absolute_displace": "Uabs",
+    "local_damage": "damage",
     "strain_field": "epsilon_x, epsilon_y, epsilon_xy",
     "stress_field": "sigma_x, sigma_y, sigma_xy",
     "distortion_energy": "w_distortion"
@@ -81,6 +82,7 @@ class Simulation2d(Problem2d):
         print("*" * 32)
         if self.ready():
             self._u_, self._eps_, self._sigma_ = None, None, None
+            self._u_abs_, self._w_dis_, self._damage_ = None, None, None
 
     @property
     def app_name(self):
@@ -215,6 +217,7 @@ class CrackSimulation2d(PdSimulation2d):
     def __init__(self, mesh2d, material2d, bconds):
         super().__init__(mesh2d, material2d, bconds)
         self._DATA_MAPPING_["displace_field"] = type(self).u.fget
+        self._DATA_MAPPING_["local_damage"] = type(self).u.fget
         self._weight_host_ = []
         self._n_dgfe_ = 0
         _1, _2 = self.mesh.n_elements, len(
@@ -235,6 +238,10 @@ class CrackSimulation2d(PdSimulation2d):
         return True
 
     @property
+    def local_damage(self):
+        return self.damage
+
+    @property
     def u(self):
         if not self._selfcheck():
             return None
@@ -243,6 +250,16 @@ class CrackSimulation2d(PdSimulation2d):
                                                  self.boundary_conds,
                                                  self.basis)
         return self._u_
+
+    @property
+    def damage(self):
+        if not self._selfcheck():
+            return None
+        if self._damage_ is None or self._u_.shape[0] != self._damage_.shape[0]:
+            self._damage_ = postprocessing.get_local_damage(
+                self.mesh.nodes, self.mesh.elements, self.basis,
+                self.mesh.bonds, self._connection_)
+        return self._damage_
 
     def detect_failure(self, max_distortion_energy):
         if not self._selfcheck():

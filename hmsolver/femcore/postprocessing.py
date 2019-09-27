@@ -30,6 +30,30 @@ def get_deform_mesh(nodes, displace_field):
     return node_deform
 
 
+def get_local_damage(nodes, elements, basis, related, connection):
+    n_nodes, n_elements, n_basis = len(nodes), len(elements), basis.length
+    n_gauss = connection.shape[-1]
+    n_fullconnect = n_gauss**2
+    node_damage = np.zeros(shape=(n_nodes, 1))
+    elem_damage = np.zeros(shape=(n_elements, 1))
+    frequent = np.zeros(shape=(n_nodes, 1))
+    bond_cnt = np.sum(np.sum(connection, axis=3), axis=2)
+    for i in range(n_elements):
+        a, b, c, d = nodes[elements[i, :], :]
+        aera = np.abs(xmult(b, a, c)) + np.abs(xmult(c, a, d))
+        res, tot = 0, 0
+        res = np.sum([bond_cnt[i, _] for _ in related[i]])
+        tot = n_fullconnect * len(related[i])
+        elem_damage = 1 - res / tot
+        for j in range(n_basis):
+            node_index = elements[i, j]
+            frequent[node_index] += aera
+            node_damage[node_index] += aera * elem_damage
+    node_damage /= frequent
+    print(f"{sys._getframe().f_code.co_name} done.")
+    return node_damage
+
+
 def get_strain_field(nodes, elements, basis, displace_field):
     # jacobi = [[pxpxg, pxpyg],
     #           [pypxg, pypyg]]
