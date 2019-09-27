@@ -1,5 +1,7 @@
 import time
+import numpy as np
 
+from hmsolver.femcore.gaussint import gauss_point_quadrature_standard
 from hmsolver.meshgrid.hybrid_mesh2d import HybridMesh2d
 from hmsolver.material.pd_material2d import PdMaterial2d
 from hmsolver.basis.basisinfo import is_suitable_for_mesh
@@ -27,13 +29,20 @@ class Simulation2d(Problem2d):
         self.__basis_ = None
         self._state_ = [False, False, False, False]
         self.__app_name_ = None
-        self.__provied_solutions_ = [
+        self._provied_solutions_ = [
             "displace_field",
             "absolute_displace",
             "strain_field",
             "stress_field",
             "distortion_energy",
         ]
+        self._DATA_MAPPING_ = {
+            "displace_field": type(self).u.fget,
+            "absolute_displace": type(self).u_abs.fget,
+            "strain_field": type(self).epsilon.fget,
+            "stress_field": type(self).sigma.fget,
+            "distortion_energy": type(self).w_dis.fget
+        }
 
     def _check_mesh(self):
         self._state_[0] = self.mesh.is_ready()
@@ -72,7 +81,6 @@ class Simulation2d(Problem2d):
         print("*" * 32)
         if self.ready():
             self._u_, self._eps_, self._sigma_ = None, None, None
-            self._u_abs_, self._w_dis_ = None, None
 
     @property
     def app_name(self):
@@ -80,7 +88,7 @@ class Simulation2d(Problem2d):
 
     @property
     def provied_solutions(self):
-        return self.__provied_solutions_
+        return self._provied_solutions_
 
     @app_name.setter
     def app_name(self, name):
@@ -173,20 +181,17 @@ class Simulation2d(Problem2d):
         header = ["X, Y"]
         header.extend([HEADER[_] for _ in orders])
         cfg["variables"] = ", ".join(header)
-        __DATA_MAPPING_ = {
-            "displace_field": self.u,
-            "absolute_displace": self.u_abs,
-            "strain_field": self.epsilon,
-            "stress_field": self.sigma,
-            "distortion_energy": self.w_dis
-        }
-        data = [__DATA_MAPPING_[_] for _ in orders]
+        data = [self._DATA_MAPPING_[_](self) for _ in orders]
         postprocessing.export_tecplot_data(
             f"{self.app_name}-{export_filename}.dat", cfg, self.mesh.nodes,
             self.mesh.elements, *data)
 
 
 class PdSimulation2d(Simulation2d, PdProblem2d):
+    def __init__(self, mesh2d, material2d, bconds):
+        super().__init__(mesh2d, material2d, bconds)
+        self._DATA_MAPPING_["displace_field"] = type(self).u.fget
+
     def _check_mesh(self):
         self._state_[0] = self.mesh.is_pdready()
         return self._state_[0]
@@ -209,8 +214,12 @@ class PdSimulation2d(Simulation2d, PdProblem2d):
 class CrackSimulation2d(PdSimulation2d):
     def __init__(self, mesh2d, material2d, bconds):
         super().__init__(mesh2d, material2d, bconds)
-        self._contains_weight_function_ = []
+        self._DATA_MAPPING_["displace_field"] = type(self).u.fget
+        self._weight_host_ = []
         self._n_dgfe_ = 0
+        _1, _2 = self.mesh.n_elements, len(
+            gauss_point_quadrature_standard()[0])
+        self._connection_ = np.ones(shape=(_1, _1, _2, _2), dtype=np.bool)
 
     def _selfcheck(self):
         if not self.ready():
@@ -221,10 +230,8 @@ class CrackSimulation2d(PdSimulation2d):
             print("Pls set maximun bond stretch first.")
             print("eg: app.material.stretch_crit = 1.1")
             return False
-        if not len(self._contains_weight_function_) == self.mesh.n_elements:
-            self._contains_weight_function_ = [
-                False for _ in range(self.mesh.n_elements)
-            ]
+        if not len(self._weight_host_) == self.mesh.n_elements:
+            self._weight_host_ = [False for _ in range(self.mesh.n_elements)]
         return True
 
     @property
@@ -247,7 +254,7 @@ class CrackSimulation2d(PdSimulation2d):
             element_indices.extend(self.mesh.adjoint[c_index])
         for e_index in set(element_indices):
             self.mesh.manual_set_rule_at_element(e_index)
-            self._contains_weight_function_[e_index] = True
+            self._weight_host_[e_index] = True
         return True
 
     def manual_set_failureprone_zone(self, zone: ProneRing2d):
@@ -265,7 +272,7 @@ class CrackSimulation2d(PdSimulation2d):
     def run_simulation(self, total_phases=1, max_iter=100):
         if not self._selfcheck():
             return None
-        self._u_, self._n_dgfe_ = main_procedure.simulate(
+        self._u_, self._n_dgfe_, self._connection_ = main_procedure.simulate(
             self.mesh, self.material, self.boundary_conds, self.basis,
-            (self.app_name, self._n_dgfe_, self._contains_weight_function_),
-            (total_phases, max_iter))
+            (self._n_dgfe_, self._weight_host_, self._connection_),
+            (self.app_name, total_phases, max_iter))
