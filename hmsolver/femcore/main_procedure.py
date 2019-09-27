@@ -225,30 +225,31 @@ def simulate(mesh2D, material2D, bconds, basis, app_data, simulate_configs):
         epsilon = get_strain_field(p, t, basis, u)
         sigma = get_stress_field(constitutive, epsilon)
         w_dis = get_distortion_energy(youngs_modulus, poissons_ratio, sigma)
+        local_damage = get_local_damage(p, t, basis, mesh2D.bonds, connection)
         # without deformation
         plot_cfg = generate_tecplot_config(n_nodes, n_elements, basis.length)
         plot_cfg[
-            "variables"] = "X, Y, Ux, Uy, Uabs, epsilon_x, epsilon_y, epsilon_xy, sigma_x, sigma_y, sigma_xy, w_distortion"
+            "variables"] = "X, Y, Ux, Uy, Uabs, damage, epsilon_x, epsilon_y, epsilon_xy, sigma_x, sigma_y, sigma_xy, w_distortion"
         export_tecplot_data(
-            f"{app_name}-simulate-phase-{phase:02d}-{n_elements}-elements.dat",
-            plot_cfg, p, t, u, u_abs, epsilon, sigma, w_dis)
+            f"{app_name}-simulate-phase-{phase:04d}-{n_elements}-elements.dat",
+            plot_cfg, p, t, u, u_abs, local_damage, epsilon, sigma, w_dis)
         # containing deformation
         deform_cfg = generate_tecplot_config(n_nodes, n_elements, basis.length)
-        deform_cfg["variables"] = "X, Y, Ux, Uy, Uabs"
+        deform_cfg["variables"] = "X, Y, Ux, Uy, Uabs, damage"
         export_tecplot_data(
-            f"{app_name}-simulate-phase-{phase:02d}-{n_elements}-elements-deform.dat",
-            deform_cfg, p_deform, t, u, u_abs)
+            f"{app_name}-simulate-phase-{phase:04d}-{n_elements}-elements-deform.dat",
+            deform_cfg, p_deform, t, u, u_abs, local_damage)
         w_rough = mesh2D.get_weight_function_value_roughly()
         alpha_cfg = generate_tecplot_config(n_nodes, n_elements, basis.length)
-        alpha_cfg["variables"] = "X, Y, alpha"
+        alpha_cfg["variables"] = "X, Y, alpha, damage"
         export_tecplot_data(
-            f"{app_name}-simulate-phase-{phase:02d}-{n_elements}-elements-alpha-roughly.dat",
-            alpha_cfg, p, t, w_rough)
+            f"{app_name}-simulate-phase-{phase:04d}-{n_elements}-elements-alpha-roughly.dat",
+            alpha_cfg, p, t, w_rough, local_damage)
         w_exact = mesh2D.get_weight_function_value_exactly((w_, xg, yg), basis)
         export_tecplot_data(
-            f"{app_name}-simulate-phase-{phase:02d}-{n_elements}-elements-alpha-exactly.dat",
-            alpha_cfg, p, t, w_exact)
+            f"{app_name}-simulate-phase-{phase:04d}-{n_elements}-elements-alpha-exactly.dat",
+            alpha_cfg, p, t, w_exact, local_damage)
     print(
-        f"total phase {TOTAL_PHASES}, total time cost {utils.formatting_time(time.time() - start_timestamp)}"
+        f"total phase {total_phases}, total time cost {utils.formatting_time(time.time() - start_timestamp)}"
     )
     return u, n_dgfe, connection
