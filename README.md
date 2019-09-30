@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.1a2-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -17,10 +17,11 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 
 ## Update Log(Most Recent)
 
-![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
-* **DOC**: *Improvement*. Add the mesh data of example-04.
-* **DEV**: *Improvement*. It's now using another way to run the simulation lazily. It runs until it needs.
-* **DEV**: *Code Beautification*. I rewrote the weighting function section to make it clearer than before.
+![Version](https://img.shields.io/badge/pre--release-0.4.1a2-brightgreen.svg)
+* **DEV**: *New Feature*. It can now product local damage contour.
+* **DEV**: *New Feature*. Add `hmsolver.utils.SingletonDecorator`.
+* **DEV**: *Code Beautification*. Refactoring the PD Stiffness Matrix module.
+* **BUG**: *Fixed*. It will export the simulation solution file with same width of phase_id.
 
 [(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
 

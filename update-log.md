@@ -1,5 +1,11 @@
 # Update Log
 
+* 2019-09-30 ![Version](https://img.shields.io/badge/pre--release-0.4.1a2-brightgreen.svg)
+  * **DEV**: *New Feature*. It can now product local damage contour.
+  * **DEV**: *New Feature*. Add `hmsolver.utils.SingletonDecorator`.
+  * **DEV**: *Code Beautification*. Refactoring the PD Stiffness Matrix module.
+  * **BUG**: *Fixed*. It will export the simulation solution file with same width of phase_id.
+
 * 2019-09-27 ![Version](https://img.shields.io/badge/pre--release-0.4.0a1-brightgreen.svg)
   * **DOC**: *Improvement*. Add the mesh data of example-04.
   * **DEV**: *Improvement*. It's now using another way to run the simulation lazily. It runs until it needs.
