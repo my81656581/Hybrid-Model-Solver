@@ -69,4 +69,5 @@ def convert_gmsh_into_msh(gmsh_data_file: str, export_file: str):
         for _ in (nodes_without_toolmen, elements):
             print(len(_), file=fout)
             [print("\t".join(map(str, __)), file=fout) for __ in _]
+    print(f"Converted {gmsh_data_file} into {export_file}")
     return n_nodes, n_elements
