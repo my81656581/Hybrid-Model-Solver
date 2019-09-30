@@ -12,12 +12,12 @@ class PrototypePdMesh2d(Mesh2d):
         self._pdready_ = False
 
     def peridynamic_construct(self, horizon_radius: float) -> None:
-        self.__startup(horizon_radius)
+        self._startup(horizon_radius)
         self._build_dist()
-        self.__build_bonds()
+        self._build_bonds()
         self._pdready_ = True
 
-    def __startup(self, horizon_radius) -> None:
+    def _startup(self, horizon_radius) -> None:
         """Startup the peridynamic config.
         
         Args:
@@ -32,7 +32,7 @@ class PrototypePdMesh2d(Mesh2d):
         self.centers = np.mean(self.nodes[self.elements], 1)
         self._dist_ = squareform(pdist(self.centers))
 
-    def __build_bonds(self) -> None:
+    def _build_bonds(self) -> None:
         ngrid_in_line = int(np.sqrt(self.n_elements))
         assert ngrid_in_line**2 == self.n_elements
         ngrid_in_halfline = ngrid_in_line // 2
