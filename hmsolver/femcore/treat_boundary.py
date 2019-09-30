@@ -1,7 +1,8 @@
 import numpy as np
 from collections import namedtuple
 
-import hmsolver.geometry as geometry
+from hmsolver.geometry import is0, xmult
+from hmsolver.geometry import EPS, BIG
 
 __all__ = [
     'point_criteria', 'segment_criteria', 'find_point', 'find_segment',
@@ -14,8 +15,6 @@ __all__ = [
     'just_set_segment_ux_uy_by_lambda', 'Boundary_Func', 'Boundary_Cond',
     'boundary_cond2d', 'CompiledBoundaryConds2d', 'BoundaryConds2d'
 ]
-
-EPS, BIG = geometry.EPS, geometry.BIG
 
 
 def __set_zero(stiff, load, target, val):
@@ -41,18 +40,16 @@ def __nop(a, b, c, d):
 
 def point_criteria(x0, y0):
     def criteria(x, y):
-        return geometry.is_zero(x - x0) and geometry.is_zero(y - y0)
+        return is0(x - x0) and is0(y - y0)
 
     return criteria
 
 
 def segment_criteria(x_start, y_start, x_end, y_end):
     def criteria(x, y):
-        return geometry.is_zero(
-            geometry.xmult(
-                (x, y), (x_start, y_start),
-                (x_end, y_end))) and (x_start - x) * (x_end - x) < EPS and (
-                    y_start - y) * (y_end - y) < EPS
+        return is0(xmult(
+            (x, y), (x_start, y_start), (x_end, y_end))) and (x_start - x) * (
+                x_end - x) < EPS and (y_start - y) * (y_end - y) < EPS
 
     return criteria
 
@@ -76,9 +73,10 @@ def find_segment(nodes, criteria):
 
 def just_set_point(stiff, load, nodes, target, fixed_ux, fixed_uy):
     n_nodes = len(nodes)
-    apply_ux, apply_uy = [(__set_zero if geometry.is_zero(_) else __set_value)
-                          if _ != None else __nop
-                          for _ in [fixed_ux, fixed_uy]]
+    apply_ux, apply_uy = [
+        (__set_zero if is0(_) else __set_value) if _ != None else __nop
+        for _ in [fixed_ux, fixed_uy]
+    ]
     apply_ux(stiff, load, target, fixed_ux)
     apply_uy(stiff, load, target + n_nodes, fixed_uy)
     return True
@@ -118,9 +116,10 @@ def just_set_point_ux_uy_by_lambda(stiff, load, nodes, target, fixed_ux_uy):
 
 def just_set_segment(stiff, load, nodes, targets, fixed_ux, fixed_uy):
     n_nodes, ret = len(nodes), False
-    apply_ux, apply_uy = [(__set_zero if geometry.is_zero(_) else __set_value)
-                          if _ != None else __nop
-                          for _ in [fixed_ux, fixed_uy]]
+    apply_ux, apply_uy = [
+        (__set_zero if is0(_) else __set_value) if _ != None else __nop
+        for _ in [fixed_ux, fixed_uy]
+    ]
     for idx in targets:
         apply_ux(stiff, load, idx, fixed_ux)
         apply_uy(stiff, load, idx + n_nodes, fixed_uy)
