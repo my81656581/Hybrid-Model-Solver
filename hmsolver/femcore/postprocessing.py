@@ -6,10 +6,11 @@ import hmsolver.utils as utils
 
 from hmsolver.femcore.stiffness import preprocessing_jacobi
 from hmsolver.geometry import xmult
+from hmsolver.algebra import quadratic_equation
 
 __all__ = [
     'get_absolute_displace', 'get_deform_mesh', 'get_strain_field',
-    'get_stress_field', 'get_distortion_energy',
+    'get_stress_field', 'get_distortion_energy_density',
     'convert_distortion_energy_for_element',
     'maximum_distortion_energy_criterion', 'generate_tecplot_config',
     'export_tecplot_data'
@@ -44,7 +45,10 @@ def get_local_damage(nodes, elements, basis, related, connection):
         res, tot = 0, 0
         res = np.sum([bond_cnt[i, _] for _ in related[i]])
         tot = n_fullconnect * len(related[i])
-        elem_damage = 1 - res / tot
+        if tot == 0:
+            elem_damage = 0
+        else:
+            elem_damage = 1 - res / tot
         for j in range(n_basis):
             node_index = elements[i, j]
             frequent[node_index] += aera
@@ -94,16 +98,27 @@ def get_stress_field(constructive, strain_field):
     return stress_field.T
 
 
-def get_distortion_energy(youngs_modulus, poissons_ratio, stress_field):
-    # Distortion Energy
-    # W = \frac{1 + \mu}{6E} \bigl[ (sigma_1 - sigma_2)^2 + (sigma_2 - sigma_3)^2 + (sigma_3 - sigma_1)^2 \bigr]
-    # w= 2 * a^2 + 2 * b^2 - 2 * a * b + 6 * c^2
-    a, b, c = [stress_field[:, _] for _ in range(3)]
-    coefficient = (1 + poissons_ratio) / 6.0 / youngs_modulus
-    distortion_energy = coefficient * (2 * a**2 + 2 * b**2 - 2 * a * b +
-                                       6 * c**2)
+def get_distortion_energy_density(stress_field, strain_field):
+    # nu_epsilon: strain energy density
+    # nu_v: dilatational strain energy density
+    # nu_d: distortional strain energy density
+    # average strain, epsilon_m := 1/3 (epsilon_1 + epsilon_2 + epsilon_3)
+    # average stress,   sigma_m := 1/3 (sigma_1 + sigma_2 + sigma_3)
+    # nu_epsilon == nu_v + nu_d
+    # nu_epsilon := 1/2 * sigma_ij epsilon_ij
+    #       nu_v := 3/2 * sigma_m epsilon_m
+    # =>    nu_d := nu_epsilon - nu_v
+    _1, _2, _3 = [stress_field[:, _] for _ in range(3)]
+    _4, _5, _6 = [strain_field[:, _] for _ in range(3)]
+    s1, s2 = quadratic_equation(1, -(_1 + _2), _1 * _2 - _3**2)
+    e1, e2 = quadratic_equation(1, -(_4 + _5), _4 * _5 - _6**2)
+    # nu_epsilon = 0.5 * (s1 * e1 + s2 * e2)
+    # sigma_m, epsilon_m = (s1 + s2) / 3.0, (e1 + e2) / 3.0
+    # nu_v = 1.5 * sigma_m * epsilon_m
+    # nu_d = nu_epsilon - nu_v
+    nu_d = (s1 * e1 + s2 * e2 + (s1 - s2) * (e1 - e2)) / 6.0
     print(f"{sys._getframe().f_code.co_name} done.")
-    return distortion_energy
+    return nu_d
 
 
 def convert_distortion_energy_for_element(distortion_energy, elements):

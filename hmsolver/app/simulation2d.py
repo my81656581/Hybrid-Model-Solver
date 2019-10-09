@@ -170,9 +170,8 @@ class Simulation2d(Problem2d):
         if not self._selfcheck():
             return None
         if self._w_dis_ is None or self._u_.shape[0] != self._w_dis_.shape[0]:
-            self._w_dis_ = postprocessing.get_distortion_energy(
-                self.material.youngs_modulus, self.material.poissons_ratio,
-                self.sigma)
+            self._w_dis_ = postprocessing.get_distortion_energy_density(
+                self.sigma, self.epsilon)
         return self._w_dis_
 
     def export_to_tecplot(self, export_filename, *orders):

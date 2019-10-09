@@ -24,7 +24,7 @@ from hmsolver.femcore.treat_boundary import BoundaryConds2d
 from hmsolver.femcore.postprocessing import get_absolute_displace
 from hmsolver.femcore.postprocessing import get_strain_field
 from hmsolver.femcore.postprocessing import get_stress_field
-from hmsolver.femcore.postprocessing import get_distortion_energy
+from hmsolver.femcore.postprocessing import get_distortion_energy_density
 from hmsolver.femcore.postprocessing import convert_distortion_energy_for_element
 from hmsolver.femcore.postprocessing import maximum_distortion_energy_criterion
 from hmsolver.femcore.postprocessing import get_deform_mesh
@@ -187,8 +187,6 @@ def simulate_phase(max_iter: int,
 def simulate(mesh2D, material2D, bconds, basis, app_data, simulate_configs):
     n_dgfe, contains_weight_function, connection = app_data
     app_name, total_phases, max_iter = simulate_configs
-    youngs_modulus = material2D.youngs_modulus
-    poissons_ratio = material2D.poissons_ratio
     constitutive = material2D.constitutive
     w_, xg, yg = gauss_point_quadrature_standard()
     n_elements = mesh2D.n_elements
@@ -224,7 +222,7 @@ def simulate(mesh2D, material2D, bconds, basis, app_data, simulate_configs):
         p_deform = get_deform_mesh(p, u)
         epsilon = get_strain_field(p, t, basis, u)
         sigma = get_stress_field(constitutive, epsilon)
-        w_dis = get_distortion_energy(youngs_modulus, poissons_ratio, sigma)
+        w_dis = get_distortion_energy_density(sigma, epsilon)
         local_damage = get_local_damage(p, t, basis, mesh2D.bonds, connection)
         # without deformation
         plot_cfg = generate_tecplot_config(n_nodes, n_elements, basis.length)
