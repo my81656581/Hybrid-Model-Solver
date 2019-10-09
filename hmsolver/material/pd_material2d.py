@@ -26,9 +26,8 @@ class PdMaterial2d(Material2d):
         scale = self.horizon_radius // self.grid_size
         assert scale > 0
         grids = 2 * scale + 1
-        _l, _r, _d = 0, grids * self.grid_size, self.grid_size
-        self.__mesh_ = Zone2d(_l, _r, _l,
-                              _r).meshgrid_zone(PrototypePdMesh2d, _d)
+        l, r, d = 0, grids * self.grid_size, self.grid_size
+        self.__mesh_ = Zone2d(l, r, l, r).meshgrid_zone(PrototypePdMesh2d, d)
         self.__mesh_.peridynamic_construct(self.horizon_radius)
 
     def generate_coef(self):
@@ -44,13 +43,18 @@ class PdMaterial2d(Material2d):
 
         return np.vectorize(helper)
 
-    def setIsotropic(self, horizon_radius, grid_size, inst_len):
+    def setOrthotropic(self, E1, E2, v12, v21, G_eff):
+        super().setOrthotropic(E1, E2, v12, v21, G_eff)
+        self.__pdready_ = False
+        self.__stretch_crit_ = None
+
+    def setPeridynamic(self, horizon_radius, grid_size, inst_len):
         self.__horizon_radius_ = horizon_radius
         self.__grid_size_ = grid_size
         self.__inst_len_ = inst_len
-        self.__syncIsotropic()
+        self.__sync_stiffness()
 
-    def __syncIsotropic(self):
+    def __sync_stiffness(self):
         self.__init_std_meshgrid()
         grid_vol = self.grid_size**2
         basis = Quad4Node()

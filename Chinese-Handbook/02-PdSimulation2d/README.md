@@ -138,7 +138,7 @@ app.app_name = "plate"
 from hmsolver.basis.quad4 import Quad4Node
 horizon_radius = 0.06
 inst_len = 0.015
-app.material.setIsotropic(horizon_radius, grid_size, inst_len)
+app.material.setPeridynamic(horizon_radius, grid_size, inst_len)
 app.mesh.peridynamic_construct(horizon_radius, 2 * horizon_radius,
                                4 * horizon_radius)
 app.apply_basis(Quad4Node())
@@ -235,7 +235,7 @@ get_distortion_energy done.
 ```python
 app = CrackSimulation2d(mesh2d, material2d, boundarys)
 app.app_name = "plate"
-app.material.setIsotropic(horizon_radius, grid_size, inst_len)
+app.material.setPeridynamic(horizon_radius, grid_size, inst_len)
 app.material.stretch_crit = 1.1
 app.mesh.peridynamic_construct(horizon_radius, 2 * horizon_radius,
                                4 * horizon_radius)
@@ -284,7 +284,7 @@ inst_len = 0.0005
 
 app = CrackSimulation2d(mesh2d, material2d, boundarys)
 app.app_name = "plate2"
-app.material.setIsotropic(horizon_radius, grid_size, inst_len)
+app.material.setPeridynamic(horizon_radius, grid_size, inst_len)
 app.material.stretch_crit = 1.1
 app.mesh.peridynamic_construct(horizon_radius, 2 * horizon_radius,
                                4 * horizon_radius)

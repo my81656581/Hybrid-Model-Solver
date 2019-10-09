@@ -39,7 +39,7 @@ if __name__ == '__main__':
     app.app_name = "plate"
     horizon_radius, inst_len = 0.06, 0.015
     app.material.stretch_crit = 1.1
-    app.material.setIsotropic(horizon_radius, grid_size, inst_len)
+    app.material.setPeridynamic(horizon_radius, grid_size, inst_len)
     app.mesh.peridynamic_construct(horizon_radius, 2 * horizon_radius,
                                    4 * horizon_radius)
     app.apply_basis(Quad4Node())

@@ -16,6 +16,19 @@ class Material2d(object):
                                          [0, 0, c33]])
         self.__ready_ = True
 
+    def setOrthotropic(self, E1, E2, v12, v21, G_eff):
+        self.__youngs_modulus_ = (E1, E2)
+        self.__poissons_ratio_ = (v12, v21)
+        self.__lame_mu_ = G_eff
+        self.__lame_lambda_ = 0
+        coeff = 1 - v12 * v21
+        c11, c22 = E1 / coeff, E2 / coeff
+        c12, c21 = c11 * v21, c22 * v12
+        c33 = G_eff
+        self.__constitutive_ = np.array([[c11, c12, 0], [c21, c11, 0],
+                                         [0, 0, c33]])
+        self.__ready_ = True
+
     @property
     def youngs_modulus(self):
         return self.__youngs_modulus_
