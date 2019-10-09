@@ -128,9 +128,9 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
     n_elements, n_stiffsize = len(elements), basis.length
     ret = np.zeros((n_elements, 2 * n_stiffsize, 2 * n_stiffsize))
     c11, c12 = constitutive[0, 0], constitutive[0, 1]
-    shear_modulus = constitutive[2, 2]
+    c22, shear_modulus = constitutive[1, 1], constitutive[2, 2]
     d_11 = np.vectorize(lambda x, y: c11)
-    d_22 = np.vectorize(lambda x, y: c11)
+    d_22 = np.vectorize(lambda x, y: c22)
     d_12 = np.vectorize(lambda x, y: c12)
     d_33 = np.vectorize(lambda x, y: shear_modulus)
     # time counter init begin
@@ -214,7 +214,7 @@ def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
         # time counter runs begin
         if i > flag:
             flag = utils.display_progress(
-                msg="        mapping stiffness martix (with weight)",
+                msg="        mapping stiffness martix with weight",
                 current=flag,
                 display_sep=flag_0,
                 current_id=i,
@@ -237,7 +237,7 @@ def mapping_element_stiffness_matrix_with_weight(nodes, elements, centers,
     # time counter summary begin
     tot = time.time() - t0
     print(
-        f"        assembling (with weight) completed. Total {utils.formatting_time(tot)}"
+        f"        assembling with weight completed. Total {utils.formatting_time(tot)}"
     )
     # time counter summary end
     return ret
