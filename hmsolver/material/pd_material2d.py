@@ -36,12 +36,13 @@ class PdMaterial2d(Material2d):
 
         def helper(x, y):
             # phi = np.arctan2(y, x)
-            xi = np.hypot(x, y)
-            scale = np.array([c0, c1, c2])
+            xi = np.hypot(x, y).reshape((-1, 1))
+            scale = np.array([c0, c1, c2]).reshape((1, -1))
             # scale = np.array([c0, c1 * np.cos(2 * phi), c2 * np.cos(4 * phi)])
-            return scale * np.exp(-xi / inst_len)
+            return np.exp(-xi / inst_len) @ scale
 
-        return np.vectorize(helper)
+        return helper
+        # return np.vectorize(helper)
 
     def setOrthotropic(self, E1, E2, v12, v21, G_eff):
         super().setOrthotropic(E1, E2, v12, v21, G_eff)
