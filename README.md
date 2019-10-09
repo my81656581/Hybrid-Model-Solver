@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.4.2a3-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.2a4-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -17,10 +17,10 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 
 ## Update Log(Most Recent)
 
-![Version](https://img.shields.io/badge/pre--release-0.4.2a3-brightgreen.svg)
-* **DEV**: *New Feature*. Add computing geometry about line segments.
-* **DEV**: *Code Beautification*. Add a hint when the conversion of gmsh input into mesh is done.
-* **DEV**: *New Feature*. Add class `HybridCrackMesh2d` to handle the region that contains cracks.
+* **DEV**: *Improvement*. Integrated output data.
+* **DEV**: *Improvement*. Improved method for calculating distortion energy.
+* **BUG**: *Fixed*. Improved calculation accuracy.
+* **DEV**: *New Feature*. Add module `algebra` to storage the related method.
 
 [(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
 
