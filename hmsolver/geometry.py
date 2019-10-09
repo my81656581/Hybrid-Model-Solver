@@ -2,7 +2,7 @@
 import numpy as np
 
 # EPS = np.spacing(10)
-EPS = 1e-8
+EPS = 1e-9
 SPACING = 10 * EPS
 BIG = 1e10
 
