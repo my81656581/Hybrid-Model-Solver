@@ -1,10 +1,9 @@
 # Update Log
 
 * 2019-10-01 ![Version](https://img.shields.io/badge/pre--release-0.4.2a3-brightgreen.svg)
-  * **DEV**: *New Feature*. It can now product local damage contour.
-  * **DEV**: *New Feature*. Add `hmsolver.utils.SingletonDecorator`.
-  * **DEV**: *Code Beautification*. Refactoring the PD Stiffness Matrix module.
-  * **BUG**: *Fixed*. It will export the simulation solution file with same width of phase_id.
+  * **DEV**: *New Feature*. Add computing geometry about line segments.
+  * **DEV**: *Code Beautification*. Add a hint when the conversion of gmsh input into mesh is done.
+  * **DEV**: *New Feature*. Add class `HybridCrackMesh2d` to handle the region that contains cracks.
 
 * 2019-09-30 ![Version](https://img.shields.io/badge/pre--release-0.4.1a2-brightgreen.svg)
   * **DEV**: *New Feature*. It can now product local damage contour.
