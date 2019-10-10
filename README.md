@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.4.2a4-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.3a5-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This

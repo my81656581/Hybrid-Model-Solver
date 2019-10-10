@@ -6,6 +6,9 @@
 
 ## Pre-release 0.4: "Rocket"
 
+* 2019-10-10 ![Version](https://img.shields.io/badge/pre--release-0.4.3a5-brightgreen.svg)
+  * **DEV**: *Improvement*. Vectorization for PD stiffness matrix.
+  * **DEV**: *New Feature*. Add `setOrthotropic` into `Material2d` and `PdMaterial2d` for orthotropic material.
 * 2019-10-09 ![Version](https://img.shields.io/badge/pre--release-0.4.2a4-brightgreen.svg)
   * **DEV**: *Improvement*. Integrated output data.
   * **DEV**: *Improvement*. Improved method for calculating distortion energy.
