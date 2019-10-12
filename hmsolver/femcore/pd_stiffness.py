@@ -412,8 +412,8 @@ def deal_bond_stretch(nodes,
             b_abs = np.sqrt(b_x * b_x + b_y * b_y)
             b_nabs = np.sqrt(b_nx * b_nx + b_ny * b_ny)
             stretch_ijkl = (b_nabs - b_abs) / b_abs
-            stretch_max = max(stretch_max, np.max(stretch_ijkl))
-            # connect = np.array([connection[i, j, k, l] for k, l in kl])
+            connect = np.array([connection[i, j, k, l] for k, l in kl])
+            stretch_max = max(stretch_max, np.max(connect * stretch_ijkl))
             # scale = np.array([(aks[k] + als[l]) / 2 * det_jcb[i][k] * det_jcb[j][l] for k, l in kl])
             # coeff = connect * scale
             # core = coeff.reshape((-1, 1, 1)) * xi2(
