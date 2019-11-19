@@ -103,7 +103,7 @@ class HybridMesh2d(PrototypePdMesh2d):
                         self.n_nodes += 1
                         self.nodes = np.vstack((self.nodes, new_node))
                         v_manipulating[v_manipulating == vertex] = new_node_id
-                        self.adjoint.append([new_node_id])
+                        self.adjoint.append([e_manipulating])
                 self.adjoint[vertex] = [self.adjoint[vertex][0]]
             self.is_dgfem[e_idx] = True
         self.update_frequent()
