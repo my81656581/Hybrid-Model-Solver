@@ -12,6 +12,8 @@ import hmsolver.utils as utils
 from hmsolver.femcore.gaussint import gauss_point_quadrature_standard
 from hmsolver.femcore.stiffness import preprocessing_all_jacobi
 from hmsolver.femcore.stiffness import generate_stiffness_matrix_k0
+from hmsolver.femcore.stiffness import generate_body_load_vector
+from hmsolver.femcore.stiffness import generate_boundary_load_vector
 from hmsolver.femcore.stiffness import mapping_element_stiffness_matrix
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1
 from hmsolver.femcore.pd_stiffness import generate_stiffness_matrix_k1_with_connection
@@ -33,7 +35,7 @@ from hmsolver.femcore.postprocessing import generate_tecplot_config
 from hmsolver.femcore.postprocessing import export_tecplot_data
 
 __all__ = [
-    'accumulate_stiffness_matrix', 'assemble_load_vector',
+    'accumulate_stiffness_matrix', 'generate_empty_load_vector',
     'solve_linear_system', 'elasticity', 'simulate_phase', 'simulate'
 ]
 
@@ -42,17 +44,31 @@ TOTAL_PHASES = 1
 MAX_ITER = 100
 
 
-def accumulate_stiffness_matrix(*stiff_mats):
-    return reduce(lambda a, b: a + b, stiff_mats)
+def __accumulate(*mats):
+    return reduce(lambda a, b: a + b, mats)
 
 
-def assemble_load_vector(n_nodes):
+accumulate_stiffness_matrix = __accumulate
+
+accumulate_load_vector = __accumulate
+
+
+def compile_boundary_condition(bconds, nodes):
+    if isinstance(bconds, CompiledBoundaryConds2d):
+        return bconds
+    elif isinstance(bconds, BoundaryConds2d):
+        return bconds.compile(nodes)
+    else:
+        return CompiledBoundaryConds2d()
+
+
+def generate_empty_load_vector(n_nodes):
     return np.zeros((n_nodes * 2, 1))
 
 
 def solve_linear_system(a, b):
     t0 = time.time()
-    print(f"Solving Linear System: DOF={len(b)}.")
+    print(f"Solving Linear System: DOF={b.shape[0]}.")
     if sp.isspmatrix(a):
         u = np.reshape(spla.spsolve(a.tocsr(), b), (2, -1)).T
     else:
@@ -61,6 +77,60 @@ def solve_linear_system(a, b):
         f"Linear System Solved. Time cost= {utils.formatting_time(time.time() - t0)}"
     )
     return u
+
+
+def is_there_body_load_condition(cbconds):
+    ret = [
+        True for _, __ in cbconds if _.func.type == "load" and _.type == "body"
+    ]
+    return reduce(lambda x, y: x or y, ret, False)
+
+
+def assemble_body_load_vector(nodes,
+                              element,
+                              cbconds,
+                              basis,
+                              jacobis,
+                              boundary_scale=1.0):
+    body_loads = [
+        _ for _, __ in cbconds if _.func.type == "load" and _.type == "body"
+    ]
+    bs = [
+        generate_body_load_vector(nodes, element, load.func.value, basis,
+                                  jacobis) for load in body_loads
+    ]
+    return boundary_scale * __accumulate(*bs)
+
+
+def is_there_boundary_load_condition(cbconds):
+    ret = [
+        True for _, __ in cbconds if _.func.type == "load" and _.type != "body"
+    ]
+    return reduce(lambda x, y: x or y, ret, False)
+
+
+def assemble_boundary_load_vector(nodes,
+                                  element,
+                                  adjoint,
+                                  cbconds,
+                                  basis,
+                                  jacobis,
+                                  boundary_scale=1.0):
+    body_loads = [(_, __) for _, __ in cbconds
+                  if _.func.type == "load" and _.type != "body"]
+    bs = [
+        generate_boundary_load_vector(nodes, element, adjoint, load, basis,
+                                      jacobis) for load in body_loads
+    ]
+    return boundary_scale * __accumulate(*bs)
+
+
+def apply_displacement_condtitions(stiff_mat,
+                                   load_vec,
+                                   cbconds,
+                                   nodes,
+                                   boundary_scale=1.0):
+    return cbconds.apply(stiff_mat.tolil(), load_vec, nodes, boundary_scale)
 
 
 def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
@@ -73,14 +143,22 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     pickle.dump(ks0, open(f"ESM-{n_elements}-elements.bin", "wb"))
     as0 = pickle.load(open(f'ESM-{n_elements}-elements.bin', "rb"))
     a0 = mapping_element_stiffness_matrix(p, t, basis, as0)
-    b = assemble_load_vector(n_nodes)
-    pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-before.bin", "wb"))
-    if isinstance(bconds, BoundaryConds2d):
-        a0, b = bconds.compile(p).apply(a0.tolil(), b, p, boundary_scale)
-    elif isinstance(bconds, CompiledBoundaryConds2d):
-        a0, b = bconds.apply(a0.tolil(), b, p, boundary_scale)
-    pickle.dump((a0, b), open(f"ESM-{n_elements}-elements-final.bin", "wb"))
-    # a0, b = pickle.load(open(f"ESM-{n_elements}-elements-final.bin", "rb"))
+    # deal with boundary conditions
+    cbconds = compile_boundary_condition(bconds, p)
+    # body load
+    if is_there_body_load_condition(cbconds):
+        b_body = assemble_body_load_vector(p, t, cbconds, basis, jacobis)
+    else:
+        b_body = generate_empty_load_vector(n_nodes)
+    # boundary load
+    if is_there_boundary_load_condition(cbconds):
+        b_boundary = assemble_boundary_load_vector(p, t, mesh2D.adjoint,
+                                                   cbconds, basis, jacobis)
+    else:
+        b_boundary = generate_empty_load_vector(n_nodes)
+    b = accumulate_load_vector(b_body, b_boundary)
+    # displacement condtitions
+    a0, b = apply_displacement_condtitions(a0, b, cbconds, p, boundary_scale)
     u = solve_linear_system(a0, b)
     return u
 
@@ -88,16 +166,27 @@ def elasticity(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
 def peridynamic(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
     n_nodes, n_elements = mesh2D.n_nodes, mesh2D.n_elements
     p, t, related = mesh2D.nodes, mesh2D.elements, mesh2D.bonds
+    jacobis = preprocessing_all_jacobi(p, t, basis)
     # just cache for test
     k0 = assemble_stiffness_matrix(p, t, related, material2D.generate_coef(),
                                    basis)
     pickle.dump(k0, open(f"PDSM-{n_elements}-elements.bin", "wb"))
     a0 = pickle.load(open(f'PDSM-{n_elements}-elements.bin', "rb"))
-    b = assemble_load_vector(n_nodes)
-    if isinstance(bconds, BoundaryConds2d):
-        a0, b = bconds.compile(p).apply(a0.tolil(), b, p, boundary_scale)
-    elif isinstance(bconds, CompiledBoundaryConds2d):
-        a0, b = bconds.apply(a0.tolil(), b, p, boundary_scale)
+    # deal with boundary conditions
+    cbconds = compile_boundary_condition(bconds, p)
+    # body load
+    if is_there_body_load_condition(cbconds):
+        b_body = assemble_body_load_vector(p, t, cbconds, basis, jacobis)
+    else:
+        b_body = generate_empty_load_vector(n_nodes)
+    # boundary load
+    if is_there_boundary_load_condition(cbconds):
+        b_boundary = assemble_boundary_load_vector(p, t, mesh2D.adjoint,
+                                                   cbconds, basis, jacobis)
+    else:
+        b_boundary = generate_empty_load_vector(n_nodes)
+    b = accumulate_load_vector(b_body, b_boundary)
+    a0, b = apply_displacement_condtitions(a0, b, cbconds, p, boundary_scale)
     u = solve_linear_system(a0, b)
     return u
 
@@ -122,11 +211,21 @@ def hybrid(mesh2D, material2D, bconds, basis, boundary_scale=1.0):
                                                 coeff, basis)
     a0 = accumulate_stiffness_matrix(a0, -a1)
     a = accumulate_stiffness_matrix(a0, apd)
-    b = assemble_load_vector(n_nodes)
-    if isinstance(bconds, BoundaryConds2d):
-        a, b = bconds.compile(p).apply(a.tolil(), b, p, boundary_scale)
-    elif isinstance(bconds, CompiledBoundaryConds2d):
-        a, b = bconds.apply(a.tolil(), b, p, boundary_scale)
+    # deal with boundary conditions
+    cbconds = compile_boundary_condition(bconds, p)
+    # body load
+    if is_there_body_load_condition(cbconds):
+        b_body = assemble_body_load_vector(p, t, cbconds, basis, jacobis)
+    else:
+        b_body = generate_empty_load_vector(n_nodes)
+    # boundary load
+    if is_there_boundary_load_condition(cbconds):
+        b_boundary = assemble_boundary_load_vector(p, t, mesh2D.adjoint,
+                                                   cbconds, basis, jacobis)
+    else:
+        b_boundary = generate_empty_load_vector(n_nodes)
+    b = accumulate_load_vector(b_body, b_boundary)
+    a, b = apply_displacement_condtitions(a, b, cbconds, p, boundary_scale)
     u = solve_linear_system(a, b)
     return u
 
@@ -160,6 +259,21 @@ def simulate_phase(max_iter: int,
     apd = assemble_stiffness_matrix_with_weight_and_connection(
         p, t, related, connection, weight_handle, coeff, basis)
     a0 = accumulate_stiffness_matrix(a0, -a1)
+    # deal with boundary conditions
+    # body load
+    if is_there_body_load_condition(compiled_bconds):
+        b_body = assemble_body_load_vector(p, t, compiled_bconds, basis,
+                                           jacobis, boundary_scale)
+    else:
+        b_body = generate_empty_load_vector(n_nodes)
+    # boundary load
+    if is_there_boundary_load_condition(compiled_bconds):
+        b_boundary = assemble_boundary_load_vector(p, t, mesh2D.adjoint,
+                                                   compiled_bconds, basis,
+                                                   jacobis, boundary_scale)
+    else:
+        b_boundary = generate_empty_load_vector(n_nodes)
+    b0 = accumulate_load_vector(b_body, b_boundary)
     is_first = True
     broken_ep = []  # broken_endpoint
     all_broken_ep = []  # all_broken_endpoint
@@ -168,8 +282,7 @@ def simulate_phase(max_iter: int,
             break
         t0 = time.time()
         a = accumulate_stiffness_matrix(a0, apd)
-        b = assemble_load_vector(n_nodes)
-        a, b = compiled_bconds.apply(a.tolil(), b, p, boundary_scale)
+        a, b = compiled_bconds.apply(a.tolil(), b0, p, boundary_scale)
         u = solve_linear_system(a, b)
         broken_ep, cnt, apd, connection = deal_bond_stretch(
             p, t, related, weight_handle, connection, u, apd, coeff, basis,
@@ -185,24 +298,50 @@ def simulate_phase(max_iter: int,
 
 
 def simulate(mesh2D, material2D, bconds, basis, app_data, simulate_configs):
-    n_dgfe, contains_weight_function, connection = app_data
+    n_dgfe, contains_weight_function, connection, max_distortion_energy = app_data
     app_name, total_phases, max_iter = simulate_configs
     constitutive = material2D.constitutive
     w_, xg, yg = gauss_point_quadrature_standard()
     n_elements = mesh2D.n_elements
-    contains_weight_function = [False for _ in range(n_elements)]
+    # contains_weight_function = [False for _ in range(n_elements)]
+    if not len(contains_weight_function) == n_elements:
+        contains_weight_function = [False for _ in range(n_elements)]
+    w_dis = None
     start_timestamp = time.time()
     for phase in range(total_phases):
         t0 = time.time()
-        print(f"\nPhase {phase:4d}, with DGFE/tot= ({n_dgfe}/{n_elements})")
         boundary_scale = (phase + 1) / total_phases
+        print(f"\nPhase {phase:4d}, with DGFE/tot= ({n_dgfe}/{n_elements})")
         flag, runtime_id = True, 1
+        # update new critical zoon
+        if not (w_dis is None):
+            print("    Checking current distortion energy.")
+            here_max = max_distortion_energy
+            print(
+                f"    w_dis_max= {np.max(w_dis):.2e}, while criterion= {here_max:.2e}"
+            )
+            critical_indices = maximum_distortion_energy_criterion(
+                w_dis, here_max)
+            if len(critical_indices) != 0:
+                element_indices = []
+                for c_index in critical_indices:
+                    element_indices.extend(mesh2D.adjoint[c_index])
+                for e_index in set(element_indices):
+                    if contains_weight_function[e_index]: continue
+                    mesh2D.manual_set_rule_at_element(e_index)
+                    contains_weight_function[e_index] = True
+                critical = mesh2D.namelist_of_dgfem()
+                n_dgfe += mesh2D.convert_mesh_into_DGFEM(todolist=critical)
+                print(
+                    f"    {len(critical)} elements has exceed the strength limitaion."
+                )
+        # reduce the stiffness
         while flag:
             flag = False
-            cbonds = bconds.compile(mesh2D.nodes)
+            cbconds = bconds.compile(mesh2D.nodes)
             u, all_broken_ep, connection = simulate_phase(
-                max_iter, phase, runtime_id, mesh2D, material2D, cbonds, basis,
-                connection, boundary_scale)
+                max_iter, phase, runtime_id, mesh2D, material2D, cbconds,
+                basis, connection, boundary_scale)
             for c_index in all_broken_ep:
                 if contains_weight_function[c_index]: continue
                 flag = True

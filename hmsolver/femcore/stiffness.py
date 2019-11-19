@@ -4,13 +4,15 @@ import time
 
 import hmsolver.utils as utils
 
+from hmsolver.femcore.gaussint import gauss_point_linear_standard
 from hmsolver.femcore.gaussint import gauss_point_quadrature_standard
 
 __all__ = [
     'local_basis', 'element_sitffness_matrix', 'preprocessing_jacobi',
     'preprocessing_all_jacobi', 'preprocessing_all_jacobi_det',
     'generate_stiffness_matrix_k0', 'mapping_element_stiffness_matrix',
-    'mapping_element_stiffness_matrix_with_weight'
+    'mapping_element_stiffness_matrix_with_weight',
+    'generate_body_load_vector', 'generate_boundary_load_vector'
 ]
 
 
@@ -95,11 +97,11 @@ def element_sitffness_matrix(local_stiff, vertices, local_jacobi, n_stiffsize,
     w_jcb = w_ * (pxgpxpygpy - pygpxpxgpy)
     pxg = [
         local_basis(x_, y_, vertices, local_jacobi, basis, _, (1, 0))
-        for _ in range(basis.length)
+        for _ in range(n_stiffsize)
     ]
     pyg = [
         local_basis(x_, y_, vertices, local_jacobi, basis, _, (0, 1))
-        for _ in range(basis.length)
+        for _ in range(n_stiffsize)
     ]
     for ii in range(n_stiffsize):
         for jj in range(n_stiffsize):
@@ -155,6 +157,149 @@ def generate_stiffness_matrix_k0(nodes, elements, constitutive, basis,
                                  gauss_points=(w_, x_, y_),
                                  constitutive=(d_11, d_22, d_12, d_33),
                                  basis=basis)
+    # time counter summary begin
+    tot = time.time() - t0
+    print(f"        generating completed. Total {utils.formatting_time(tot)}")
+    # time counter summary end
+    return ret
+
+
+# Body force density := rho(mass density) * a(accelerate)
+def generate_body_load_vector(nodes, elements, load, basis, jacobis):
+    w_, x_, y_ = gauss_point_quadrature_standard()
+    n_nodes, n_elements, n_stiffsize = len(nodes), len(elements), basis.length
+    dof = 2 * n_nodes
+    _is, _js, _ks = [], [], []
+    load_xvalue, load_yvalue = load
+    load_x = np.vectorize(lambda x, y: load_xvalue)
+    load_y = np.vectorize(lambda x, y: load_yvalue)
+    # time counter init begin
+    flag, flag_0 = [0.17 * n_elements for _ in range(2)]
+    t0 = time.time()
+    # time counter init end
+    for i in range(n_elements):
+        # time counter runs begin
+        if i > flag:
+            flag = utils.display_progress(
+                msg="        generate boundary vector b_body",
+                current=flag,
+                display_sep=flag_0,
+                current_id=i,
+                total=n_elements,
+                start_time=t0)
+        # time counter runs end
+        vertices = nodes[elements[i, :], :]
+        local_jacobi = jacobis[i]
+        pxgpxpygpy = local_jacobi[:, 0, 0] * local_jacobi[:, 1, 1]
+        pygpxpxgpy = local_jacobi[:, 0, 1] * local_jacobi[:, 1, 0]
+        w_jcb = w_ * (pxgpxpygpy - pygpxpxgpy)
+        vg = [
+            local_basis(x_, y_, vertices, local_jacobi, basis, _, (0, 0))
+            for _ in range(n_stiffsize)
+        ]
+        for j in range(n_stiffsize):
+            idx = elements[i, j]
+            integral_rx = np.sum(w_jcb * load_x(x_, y_) * vg[j])
+            integral_ry = np.sum(w_jcb * load_y(x_, y_) * vg[j])
+            _is.extend([idx, idx + n_nodes])
+            _js.extend([0, 0])
+            _ks.extend([integral_rx, integral_ry])
+    ret = sp.coo_matrix((np.array(_ks), (np.array(_is), np.array(_js))),
+                        shape=(dof, 1)).tocsr()
+    # time counter summary begin
+    tot = time.time() - t0
+    print(f"        generating completed. Total {utils.formatting_time(tot)}")
+    # time counter summary end
+    return ret
+
+
+# face force density := pressure(force density)
+def generate_boundary_load_vector(nodes, elements, adjoint, load_config, basis,
+                                  jacobis):
+    w_, x_gauss = gauss_point_linear_standard()
+    x_gauss2, y_gauss2 = gauss_point_quadrature_standard()[1:]
+    x_Lfixed = np.array([-1, -1]).reshape((-1, 1))
+    x_Rfixed = np.array([1, 1]).reshape((-1, 1))
+    n_nodes, n_stiffsize = len(nodes), basis.length
+    dof = 2 * n_nodes
+    _is, _js, _ks = [], [], []
+    load_cond, affected_nodes = load_config
+    b_criteria = load_cond.criteria
+    load_xvalue, load_yvalue = load_cond.func.value
+    if load_cond.func.method == "constant":
+        load_x = np.vectorize(lambda x, y: load_xvalue)
+        load_y = np.vectorize(lambda x, y: load_yvalue)
+    elif load_cond.func.method == "rule":
+        load_x, load_y = load_xvalue, load_yvalue
+    affected_nodes_set = set(affected_nodes)
+    real_affected_elements = set()
+    for idx in affected_nodes:
+        for affected_elem in adjoint[idx]:
+            if affected_elem in real_affected_elements:
+                continue
+            cnt = sum([
+                1 for _ in elements[affected_elem, :]
+                if _ in affected_nodes_set
+            ])
+            if cnt == 2:
+                real_affected_elements.add(affected_elem)
+    workload = len(real_affected_elements)
+    print(f"This face load affects {workload} elements.")
+    # time counter init begin
+    flag, flag_0 = [0.17 * workload for _ in range(2)]
+    t0 = time.time()
+    # time counter init end
+    for _i_, i in enumerate(real_affected_elements):
+        # time counter runs begin
+        if _i_ > flag:
+            flag = utils.display_progress(
+                msg="        generate boundary vector b_boundary",
+                current=flag,
+                display_sep=flag_0,
+                current_id=_i_,
+                total=workload,
+                start_time=t0)
+        # time counter runs end
+        element_nodes = elements[i, :]
+        vertices = nodes[element_nodes, :]
+        local_jacobi = jacobis[i]
+        dxdxg, dydxg = basis.transform(x_gauss2, y_gauss2, vertices, (1, 0))
+        dxdyg, dydyg = basis.transform(x_gauss2, y_gauss2, vertices, (0, 1))
+        dXG = np.sqrt(dxdxg * dxdxg + dydxg * dydxg)
+        dYG = np.sqrt(dxdyg * dxdyg + dydyg * dydyg)
+        which_line = [
+            j for j, idx in enumerate(element_nodes)
+            if b_criteria(*nodes[idx, :])
+        ]
+        line_identification = which_line[0] * 10 + which_line[1]
+        if line_identification == 1:
+            # line: 0-1 <=> \eta = -1 <=> button
+            x_real, y_real, w_dA = x_gauss, x_Lfixed, w_ * dXG
+        elif line_identification == 12:
+            # line: 1-2 <=> \xi = 1 <=> right
+            x_real, y_real, w_dA = x_Rfixed, x_gauss, w_ * dYG
+        elif line_identification == 23:
+            # line: 2-3 <=> \eta = 1 <=> top
+            x_real, y_real, w_dA = x_gauss, x_Rfixed, w_ * dXG
+        elif line_identification == 3:
+            # line: 0-3 <=> \xi = -1 <=> left
+            x_real, y_real, w_dA = x_Lfixed, x_gauss, w_ * dYG
+        else:
+            # should be error
+            x_real, y_real, w_dA = x_gauss, x_gauss, w_
+        vg = [
+            local_basis(x_real, y_real, vertices, local_jacobi, basis, _,
+                        (0, 0)) for _ in range(n_stiffsize)
+        ]
+        for j in range(n_stiffsize):
+            idx = elements[i, j]
+            integral_rx = np.sum(w_dA * load_x(x_real, y_real) * vg[j])
+            integral_ry = np.sum(w_dA * load_y(x_real, y_real) * vg[j])
+            _is.extend([idx, idx + n_nodes])
+            _js.extend([0, 0])
+            _ks.extend([integral_rx, integral_ry])
+    ret = sp.coo_matrix((np.array(_ks), (np.array(_is), np.array(_js))),
+                        shape=(dof, 1)).tocsr()
     # time counter summary begin
     tot = time.time() - t0
     print(f"        generating completed. Total {utils.formatting_time(tot)}")
