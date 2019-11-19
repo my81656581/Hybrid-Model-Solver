@@ -6,6 +6,16 @@
 
 ## Pre-release 0.4: "Rocket"
 
+* 2019-11-19 ![Version](https://img.shields.io/badge/pre--release-0.4.3a6-brightgreen.svg)
+  * **BUG**: *Fixed*. Fixed not setting initial max distortion energy value.
+  * **DEV**: *Improvement*. Eliminate unnecessary bond stretch calculation.
+  * **DEV**: *New Feature*. Add unbroken zone.
+  * **BUG**: *Fixed*. Fixed errorous adjoint node_id.
+  * **DEV**: *Improvement*. Add `gauss_point_linear_standard`.
+  * **DEV**: *New Feature*. Add load boundary condition treatments.
+  * **DEV**: *Improvement*. Refactor code of boundary condition treatment.
+  * **DEV**: *New Feature*. Add `onrange_in` and `onrange_ex`.
+  * **BUG**: *Fixed*. Fixed the bond stretch code bug. The broken bond does not have stretch attribute.
 * 2019-10-10 ![Version](https://img.shields.io/badge/pre--release-0.4.3a5-brightgreen.svg)
   * **DEV**: *Improvement*. Vectorization for PD stiffness matrix.
   * **DEV**: *New Feature*. Add `setOrthotropic` into `Material2d` and `PdMaterial2d` for orthotropic material.

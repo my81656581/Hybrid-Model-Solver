@@ -2,7 +2,7 @@
 
 ![Platfrom](https://img.shields.io/badge/python-3.5+-3572A5.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Version](https://img.shields.io/badge/pre--release-0.4.3a5-brightgreen.svg)
+![Version](https://img.shields.io/badge/pre--release-0.4.3a6-brightgreen.svg)
 [![PyPI](https://img.shields.io/badge/PyPI-hmsolver-blue.svg)](https://pypi.org/project/hmsolver/)
 
 ## What is This
@@ -17,10 +17,15 @@ A Simple Simulation Tool by using morphing strategy to simulate the crack's deve
 
 ## Update Log(Most Recent)
 
-* **DEV**: *Improvement*. Integrated output data.
-* **DEV**: *Improvement*. Improved method for calculating distortion energy.
-* **BUG**: *Fixed*. Improved calculation accuracy.
-* **DEV**: *New Feature*. Add module `algebra` to storage the related method.
+* **BUG**: *Fixed*. Fixed not setting initial max distortion energy value.
+* **DEV**: *Improvement*. Eliminate unnecessary bond stretch calculation.
+* **DEV**: *New Feature*. Add unbroken zone.
+* **BUG**: *Fixed*. Fixed errorous adjoint node_id.
+* **DEV**: *Improvement*. Add `gauss_point_linear_standard`.
+* **DEV**: *New Feature*. Add load boundary condition treatments.
+* **DEV**: *Improvement*. Refactor code of boundary condition treatment.
+* **DEV**: *New Feature*. Add `onrange_in` and `onrange_ex`.
+* **BUG**: *Fixed*. Fixed the bond stretch code bug. The broken bond does not have stretch attribute.
 
 [(read more)](https://github.com/polossk/Hybrid-Model-Solver/tree/master/update-log.md)
 
