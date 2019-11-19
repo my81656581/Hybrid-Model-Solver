@@ -399,6 +399,8 @@ def deal_bond_stretch(nodes,
             if flag_i == 0 and flag_j == 0: continue
             # als = np.array(
             #     [weight_j(xj_local[l], yj_local[l]) for l in range(n_gauss)])
+            connect = np.array([connection[i, j, k, l] for k, l in kl])
+            if not np.any(connect): continue
             xi_k = np.array([xi[k] for k, l in kl])
             yi_k = np.array([yi[k] for k, l in kl])
             xj_l = np.array([xj[l] for k, l in kl])
@@ -412,7 +414,6 @@ def deal_bond_stretch(nodes,
             b_abs = np.sqrt(b_x * b_x + b_y * b_y)
             b_nabs = np.sqrt(b_nx * b_nx + b_ny * b_ny)
             stretch_ijkl = (b_nabs - b_abs) / b_abs
-            connect = np.array([connection[i, j, k, l] for k, l in kl])
             stretch_max = max(stretch_max, np.max(connect * stretch_ijkl))
             # scale = np.array([(aks[k] + als[l]) / 2 * det_jcb[i][k] * det_jcb[j][l] for k, l in kl])
             # coeff = connect * scale
