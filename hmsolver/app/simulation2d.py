@@ -222,6 +222,7 @@ class CrackSimulation2d(PdSimulation2d):
         _1, _2 = self.mesh.n_elements, len(
             gauss_point_quadrature_standard()[0])
         self._connection_ = np.ones(shape=(_1, _1, _2, _2), dtype=np.bool)
+        self._max_distortion_energy_ = 1e100
 
     def _selfcheck(self):
         if not self.ready():
@@ -263,6 +264,7 @@ class CrackSimulation2d(PdSimulation2d):
     def detect_failure(self, max_distortion_energy):
         if not self._selfcheck():
             return None
+        self._max_distortion_energy_ = max_distortion_energy
         critical_indices = postprocessing.maximum_distortion_energy_criterion(
             self.w_dis, max_distortion_energy)
         element_indices = []
@@ -319,5 +321,6 @@ class CrackSimulation2d(PdSimulation2d):
             return None
         self._u_, self._n_dgfe_, self._connection_ = main_procedure.simulate(
             self.mesh, self.material, self.boundary_conds, self.basis,
-            (self._n_dgfe_, self._weight_host_, self._connection_),
+            (self._n_dgfe_, self._weight_host_, self._connection_,
+             self._max_distortion_energy_),
             (self.app_name, total_phases, max_iter))
