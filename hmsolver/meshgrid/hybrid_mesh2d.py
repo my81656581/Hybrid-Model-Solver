@@ -80,6 +80,10 @@ class HybridMesh2d(PrototypePdMesh2d):
         tot = time.time() - t0
         print(f"building bond completed. Total {utils.formatting_time(tot)}")
 
+    def manual_set_fake_dgfem(self, todolist):
+        for elem in todolist:
+            self._is_dgfem_[elem] = True
+
     def namelist_of_dgfem(self):
         return [
             _ for _ in range(self.n_elements)

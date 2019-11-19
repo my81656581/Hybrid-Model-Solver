@@ -279,6 +279,35 @@ class CrackSimulation2d(PdSimulation2d):
         r0, r1 = zone.inner_radius, zone.outer_radius
         self.mesh.manual_set_rule_at_point(zone.x, zone.y, r0, r1)
 
+    def manual_set_unbroken_zone(self, zone_criteria):
+        # hoge = []
+        # for node_idx in range(self.mesh.n_nodes):
+        #     x, y = self.mesh.nodes[node_idx, :]
+        #     if zone_criteria(x, y):
+        #         hoge.extend(self.mesh.adjoint[node_idx])
+        # hoge = list(set(hoge))
+        # todolist = []
+        # for elem in hoge:
+        #     todolist.extend(self.mesh.bonds[elem])
+        todolist = []
+        for node_idx in range(self.mesh.n_nodes):
+            x, y = self.mesh.nodes[node_idx, :]
+            if zone_criteria(x, y):
+                todolist.extend(self.mesh.adjoint[node_idx])
+        self.mesh.manual_set_fake_dgfem(list(set(todolist)))
+
+    def manual_set_gaint_unbroken_zone(self, zone_criteria):
+        hoge = []
+        for node_idx in range(self.mesh.n_nodes):
+            x, y = self.mesh.nodes[node_idx, :]
+            if zone_criteria(x, y):
+                hoge.extend(self.mesh.adjoint[node_idx])
+        hoge = list(set(hoge))
+        todolist = []
+        for elem in hoge:
+            todolist.extend(self.mesh.bonds[elem])
+        self.mesh.manual_set_fake_dgfem(list(set(todolist)))
+
     def update_mesh(self):
         if not self._selfcheck():
             return None
