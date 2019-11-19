@@ -2,6 +2,7 @@ import numpy as np
 
 __all__ = [
     'gauss_point_linear',
+    'gauss_point_linear_standard',
     'gauss_point_quadrature',
     'gauss_point_quadrature_standard'
 ]
@@ -45,6 +46,14 @@ def gauss_point_linear(a, b, order: int = 1):
     f = np.vectorize(lambda t: (b - a) / 2 * t)
     g = np.vectorize(lambda t: f(t) + (b + a) / 2)
     return (f(w), g(x))
+
+
+def gauss_point_linear_standard(order: int = 1):
+    assert 1 <= order <= 7
+    x, w = __GAUSS_XW_DICT_[order]
+    x_ = np.reshape(x, (-1, 1))
+    w_ = np.reshape(w, (-1, 1))
+    return (w_, x_)
 
 
 def gauss_point_quadrature(x1, x2, y1, y2, order: int = 1):
