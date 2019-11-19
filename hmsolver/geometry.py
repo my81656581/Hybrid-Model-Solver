@@ -31,6 +31,16 @@ def leq0(x):
     return not gt0(x)
 
 
+def onrange_in(x, a, b):
+    # x is in [a, b]
+    return leq0((x - a) * (x - b))
+
+
+def onrange_ex(x, a, b):
+    # x is in (a, b)
+    return onrange_in(x, a, b) and not0(x - a) and not0(x - b)
+
+
 def xmult(A, O, C):
     # (O -> A) x (O -> C)
     return (A[0] - O[0]) * (C[1] - O[1]) - (C[0] - O[0]) * (A[1] - O[1])
@@ -45,7 +55,7 @@ def dot_online_in(P, A, B):
     # P belongs to segment [A, B]
     # consider endpoint A & B
     return is0(xmult(P, A, B)) and leq0(
-        (A[0] - P[0]) * (B[0] - P[0])) and leq0(A[1] - P[1]) * (B[1] - P[1])
+        (A[0] - P[0]) * (B[0] - P[0])) and leq0((A[1] - P[1]) * (B[1] - P[1]))
 
 
 def dot_online_ex(P, A, B):
